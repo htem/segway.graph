@@ -26,13 +26,15 @@ class SynapseGraph():
     Also outputs and plots are generated.
     """
 
-    def __init__(self, config_file):
+    def __init__(self, config_file, overwrite=False):
         """Initialize attributes."""
         self.config_file = config_file
 
         self.__initialize_configs(config_file)
         self.__read_configs(config_file)
         self.__check_configs()
+
+        self.overwrite = overwrite
 
         os.makedirs(self.directory, exist_ok=True)
 
@@ -46,17 +48,19 @@ class SynapseGraph():
         '''Initialize default values'''
         # create output directory with same name of config file
         self.directory = (self.config_file[:-5])  # exclude format
-        self.overwrite = False
+        # self.overwrite = False
         self.add_edge_list = []
         self.exclude_neurons = []
         self.tags_to_exclude = []
         self.exclude_edges = []
         self.exclude_synapses = []
         self.debug_edges = False
-        self.debug_edges_list = []
+        self.debug_edges_list = None
         self.rename_rules = []
         self.plots = []
         self.weights_with_dist = False
+        self.presynapse_exclusion_list = []
+        self.postsynapse_exclusion_list = []
 
         # save output files names
         self.output_graph_path = self.directory + '/output_graph.gpickle'
@@ -128,7 +132,9 @@ class SynapseGraph():
     def _get_neurons_info_db(self):
 
         nodes_attr = {}
+        print(self.neurons_list)
         for nid in self.neurons_list:
+            print(nid)
             neuron = self.neuron_db.get_neuron(nid).to_json()
             # create dictionary with attributes per neuron
             idict = dict()
@@ -445,6 +451,8 @@ class SynapseGraph():
                     if len(query) == 0:
                         # direct rename
                         rename_dict[rule[0]] = rule[1]
+                        continue
+
                     elif len(query) == 1:
                         # cell type is specifies (example interneuron_ -> basket_)
                         queried_nodes = [n for n, d in self.g.nodes(data=True) if d[list(query.keys())[0]] == list(query.values())[0]]
@@ -474,7 +482,9 @@ class SynapseGraph():
             print("Num of nodes (filtered): ", self.g.number_of_nodes())
 
     def save_user_edges_debug(self):
-        self.debug_spec_edges(self.debug_edges_list[0], self.debug_edges_list[1])
+        if self.debug_edges_list is not None and \
+                len(self.debug_edges_list) == 2:
+            self.debug_spec_edges(self.debug_edges_list[0], self.debug_edges_list[1])
 
     def debug_spec_edges(self, pre_list=None, post_list=None):
         """Debug edges: proofread output."""
@@ -513,3 +523,9 @@ class SynapseGraph():
 
     def get_graph(self):
         return self.g
+
+    def get_presynapse_exclusion_list(self):
+        return self.presynapse_exclusion_list
+
+    def get_postsynapse_exclusion_list(self):
+        return self.postsynapse_exclusion_list

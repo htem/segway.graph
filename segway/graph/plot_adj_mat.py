@@ -2,6 +2,24 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
+import copy
+
+
+def remove_exclusion_list(synapse_graph, full_list):
+    pre_exclusion_list = synapse_graph.get_presynapse_exclusion_list()
+    post_exclusion_list = synapse_graph.get_postsynapse_exclusion_list()
+    pre_list = copy.deepcopy(full_list)
+    post_list = copy.deepcopy(full_list)
+    print(pre_list)
+    print(post_list)
+    for n in pre_exclusion_list:
+        print(n)
+        pre_list.remove(n)
+    for n in post_exclusion_list:
+        print(n)
+        post_list.remove(n)
+
+    return pre_list, post_list
 
 
 def plot_adj_mat(synapse_graph, configs):  # A, configs, g):
@@ -19,19 +37,41 @@ def plot_adj_mat(synapse_graph, configs):  # A, configs, g):
     A = synapse_graph.get_matrix()
     graph = synapse_graph.get_graph()
 
-    if configs['adj_plot_thresh'] == 1:
-        A[A <= configs['weights_threshold']] = 0
+    if 'weights_threshold_min' in configs:
+        A[A < configs['weights_threshold_min']] = 0
+    if 'weights_threshold_max' in configs:
+        A[A > configs['weights_threshold_max']] = configs['weights_threshold_max']
 
     full_list = list(graph.nodes())
     fig = plt.figure(figsize=(16, 15))
     ax = fig.add_subplot(111)
 
     if configs['analysis_type'] == 'adj_plot_all':
-        mat = A
-        ax.set_xticks(np.arange(len(mat)))
-        ax.set_xticklabels(full_list, rotation=75)
-        ax.set_yticks(np.arange(len(mat)))
-        ax.set_yticklabels(full_list)
+        # mat = A
+        # mat, pre_list = remove_presynapse_exclusion_list(mat, synapse_graph, full_list)
+        # mat, post_list = remove_postsynapse_exclusion_list(mat, synapse_graph, full_list)
+
+        pre_list, post_list = remove_exclusion_list(synapse_graph, full_list)
+        print("pre_list:", pre_list)
+        print("post_list:", post_list)
+        print("full_list:", full_list)
+        print([full_list.index(i) for i in pre_list])
+        # mat = A[
+        #     [full_list.index(i) for i in post_list],
+        #     [full_list.index(i) for i in pre_list]
+        # ]
+        mat = A[
+            [full_list.index(i) for i in pre_list], :
+        ]
+        mat = mat[
+            :, [full_list.index(i) for i in post_list]
+        ]
+
+        ax.set_xticks(np.arange(mat.shape[1]))
+        ax.set_xticklabels(post_list, rotation=75)
+        ax.set_yticks(np.arange(mat.shape[0]))
+        ax.set_yticklabels(pre_list)
+
     elif configs['analysis_type'] == 'adj_plot_pre':
         mat = A[:, [full_list.index(i) for i in configs['list']]]
         ax.set_xticks(np.arange(mat.shape[1]))
