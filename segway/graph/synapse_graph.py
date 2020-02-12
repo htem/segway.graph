@@ -16,7 +16,6 @@ sys.path.insert(0, '/n/groups/htem/Segmentation/tmn7/segwaytool.proofreading')
 sys.path.insert(0, '/n/groups/htem/Segmentation/shared-dev/cb2_segmentation/segway/synful_tasks')
 import segwaytool.proofreading
 import segwaytool.proofreading.neuron_db_server
-import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
 
@@ -474,104 +473,43 @@ class SynapseGraph():
             self.g = nx.read_gpickle(self.output_graph_pp_path)
             print("Num of nodes (filtered): ", self.g.number_of_nodes())
 
-    def plot_adj_mat(self, configs):  # A, configs, g):
-        """
-        Plot Adj matrix according to the configs.
+    def save_user_edges_debug(self):
+        self.debug_spec_edges(self.debug_edges_list[0], self.debug_edges_list[1])
 
-        - configs is a dictionary with the following keys:
-        ['full', 'some', 'pre', 'post', 'threshold_value'(int/float)];
-        - the output paths are the values of the dict;
-        configs values will include the list of neuorns of interest.
-
-        If the threshold is present, all the plots will be done considering
-        that threshold.
-        """
-        if configs['adj_plot_thresh'] == 1:
-            self.A[self.A <= configs['weights_threshold']] = 0
-
-        self.full_list = list(self.g.nodes())
-        fig = plt.figure(figsize=(16, 15))
-        ax = fig.add_subplot(111)
-
-        if configs['analysis_type'] == 'adj_plot_all':
-            mat = self.A
-            ax.set_xticks(np.arange(len(mat)))
-            ax.set_xticklabels(self.full_list, rotation=75)
-            ax.set_yticks(np.arange(len(mat)))
-            ax.set_yticklabels(self.full_list)
-        elif configs['analysis_type'] == 'adj_plot_pre':
-            mat = self.A[:, [self.full_list.index(i) for i in configs['list']]]
-            ax.set_xticks(np.arange(mat.shape[1]))
-            ax.set_xticklabels(configs['list'], rotation=75)
-            ax.set_yticks(np.arange(mat.shape[0]))
-            ax.set_yticklabels(self.full_list)
-
-            # save output file for synapses proofreading
-            self.small_list = configs['list']
-            self.debug_spec_edges(an_type='pres')
-
-        elif configs['analysis_type'] == 'adj_plot_post':
-            mat = self.A[[self.full_list.index(i) for i in configs['list']], :]
-            ax.set_xticks(np.arange(mat.shape[1]))
-            ax.set_xticklabels(self.full_list, rotation=75)
-            ax.set_yticks(np.arange(mat.shape[0]))
-            ax.set_yticklabels(configs['list'])
-
-            # save output file for synapses proofreading
-            self.small_list = configs['list']
-            self.debug_spec_edges(an_type='posts')
-
-        elif configs['analysis_type'] == 'adj_plot_some':
-            mat = nx.to_numpy_matrix(self.g, nodelist=configs['list'])
-            ax.set_xticks(np.arange(len(configs['list'])))
-            ax.set_xticklabels(configs['list'], rotation=75)
-            ax.set_yticks(np.arange(len(configs['list'])))
-            ax.set_yticklabels(configs['list'])
-
-            # save output file for synapses proofreading
-            self.small_list = configs['list']
-            self.debug_spec_edges(an_type='some')
-
-        else:
-            print("### Info: analysis_type specified not implemented! Exiting...")
-            exit()
-
-        i = ax.imshow(mat)
-        plt.colorbar(i, ax=ax)
-        fig.savefig(self.directory + '/' + configs['output_plot'])
-
-    def debug_spec_edges(self, an_type=[]):
+    def debug_spec_edges(self, pre_list=None, post_list=None):
         """Debug edges: proofread output."""
-        if self.debug_edges and len(an_type) == 0:
-            el_to_save = self.debug_edges_list
-        elif an_type == "pres":
-            el_to_save = [[pre, post] for pre in self.full_list for post in self.small_list]
-            print("### Info: Saving debug edges pre partners...")
-        elif an_type == "posts":
-            el_to_save = [[pre, post] for pre in self.small_list for post in self.full_list]
-            print("### Info: Saving debug edges post partners...")
-        elif an_type == "some":
-            el_to_save = [[pre, post] for pre in self.small_list for post in self.small_list]
-            print("### Info: Saving debug edges for small Adjacency mat...")
+        # if self.debug_edges and len(an_type) == 0:
+        #     el_to_save = self.debug_edges_list
+        # else:
+        full_list = list(self.g.nodes())
+        if pre_list is None:
+            pre_list = full_list
+        if post_list is None:
+            post_list = full_list
+        el_to_save = [pre_list, post_list]
+        # elif an_type == "pres":
+        #     el_to_save = [[pre, post] for pre in full_list for post in small_list]
+        #     print("### Info: Saving debug edges pre partners...")
+        # elif an_type == "posts":
+        #     el_to_save = [[pre, post] for pre in small_list for post in full_list]
+        #     print("### Info: Saving debug edges post partners...")
+        # elif an_type == "some":
+        #     el_to_save = [[pre, post] for pre in small_list for post in small_list]
+        #     print("### Info: Saving debug edges for small Adjacency mat...")
 
         deb_edge_list = pd.DataFrame()
         for i in range(len(el_to_save)):
-            q = self.edge_list_df[(self.edge_list_df['pre_partner'] == el_to_save[i][0]) &
-                             (self.edge_list_df['post_partner'] == el_to_save[i][1])]
+            q = self.edge_list_df[
+                (self.edge_list_df['pre_partner'] == el_to_save[i][0]) &
+                (self.edge_list_df['post_partner'] == el_to_save[i][1])
+                ]
             if len(q) > 0:
                 deb_edge_list = deb_edge_list.append(q, ignore_index=True)
 
         deb_edge_list.to_csv(self.output_debug_edges_path)
 
-    def make_plots(self):
-        for plot in self.plots:
-            self.plot_adj_mat(plot)
+    def get_matrix(self):
+        return self.A
 
-
-if __name__ == '__main__':
-
-    g = SynapseGraph(sys.argv[1])
-
-    g.debug_spec_edges()  # debug specified edges
-
-    g.make_plots()
+    def get_graph(self):
+        return self.g
