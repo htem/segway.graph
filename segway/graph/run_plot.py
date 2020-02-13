@@ -24,4 +24,4 @@ if __name__ == '__main__':
         # print(config['plots'])
         for plot_config in config['plots']:
             print("Plotting", plot_config)
-            plot_adj_mat(g, plot_config)
+            plot_adj_mat(g, plot_config, 'patterns')

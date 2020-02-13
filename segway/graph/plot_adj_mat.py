@@ -2,10 +2,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
+from networkx.algorithms import moral
+from networkx.utils import reverse_cuthill_mckee_ordering
 import copy
 
 
 def remove_exclusion_list(synapse_graph, full_list):
+    """Exclude specified nodes from Adj in config file."""
     pre_exclusion_list = synapse_graph.get_presynapse_exclusion_list()
     post_exclusion_list = synapse_graph.get_postsynapse_exclusion_list()
     pre_list = copy.deepcopy(full_list)
@@ -22,7 +25,7 @@ def remove_exclusion_list(synapse_graph, full_list):
     return pre_list, post_list
 
 
-def plot_adj_mat(synapse_graph, configs):  # A, configs, g):
+def plot_adj_mat(synapse_graph, configs, sort_type=None):  # A, configs, g):
     """
     Plot Adj matrix according to the configs.
 
@@ -30,8 +33,10 @@ def plot_adj_mat(synapse_graph, configs):  # A, configs, g):
     ['full', 'some', 'pre', 'post', 'threshold_value'(int/float)];
     - the output paths are the values of the dict;
     configs values will include the list of neuorns of interest.
-
-    If the threshold is present, all the plots will be done considering
+    - sort_type sorts the matrix according to the specified type;
+    if not None, it can be 'labels', 'patterns', 'sort'. If the type is patterns,
+    the graph will be converted into an undirected graph to find blocks.
+    Note: If the threshold is present, all the plots will be done considering
     that threshold.
     """
     A = synapse_graph.get_matrix()
@@ -47,19 +52,21 @@ def plot_adj_mat(synapse_graph, configs):  # A, configs, g):
     ax = fig.add_subplot(111)
 
     if configs['analysis_type'] == 'adj_plot_all':
-        # mat = A
-        # mat, pre_list = remove_presynapse_exclusion_list(mat, synapse_graph, full_list)
-        # mat, post_list = remove_postsynapse_exclusion_list(mat, synapse_graph, full_list)
+        if sort_type == 'patterns':
+            ug = moral.moral_graph(graph)
+            rcm = list(reverse_cuthill_mckee_ordering(ug))
+            full_list = rcm
+            A = nx.adjacency_matrix(graph, nodelist=rcm).todense()
+            if 'weights_threshold_min' in configs:
+                A[A < configs['weights_threshold_min']] = 0
+            if 'weights_threshold_max' in configs:
+                A[A > configs['weights_threshold_max']] = configs['weights_threshold_max']
 
         pre_list, post_list = remove_exclusion_list(synapse_graph, full_list)
-        print("pre_list:", pre_list)
-        print("post_list:", post_list)
-        print("full_list:", full_list)
-        print([full_list.index(i) for i in pre_list])
-        # mat = A[
-        #     [full_list.index(i) for i in post_list],
-        #     [full_list.index(i) for i in pre_list]
-        # ]
+        if sort_type == 'labels':
+            pre_list = sorted(pre_list)
+            post_list = sorted(post_list)
+
         mat = A[
             [full_list.index(i) for i in pre_list], :
         ]
@@ -67,15 +74,20 @@ def plot_adj_mat(synapse_graph, configs):  # A, configs, g):
             :, [full_list.index(i) for i in post_list]
         ]
 
+        if sort_type == 'sort':
+            mat = np.sort(mat)
+
         ax.set_xticks(np.arange(mat.shape[1]))
-        ax.set_xticklabels(post_list, rotation=75)
+        ax.set_xticklabels(post_list, rotation=90)
         ax.set_yticks(np.arange(mat.shape[0]))
         ax.set_yticklabels(pre_list)
+
+        ax.grid(True, alpha=0.2)
 
     elif configs['analysis_type'] == 'adj_plot_pre':
         mat = A[:, [full_list.index(i) for i in configs['list']]]
         ax.set_xticks(np.arange(mat.shape[1]))
-        ax.set_xticklabels(configs['list'], rotation=75)
+        ax.set_xticklabels(configs['list'], rotation=90)
         ax.set_yticks(np.arange(mat.shape[0]))
         ax.set_yticklabels(full_list)
 
@@ -86,7 +98,7 @@ def plot_adj_mat(synapse_graph, configs):  # A, configs, g):
     elif configs['analysis_type'] == 'adj_plot_post':
         mat = A[[full_list.index(i) for i in configs['list']], :]
         ax.set_xticks(np.arange(mat.shape[1]))
-        ax.set_xticklabels(full_list, rotation=75)
+        ax.set_xticklabels(full_list, rotation=90)
         ax.set_yticks(np.arange(mat.shape[0]))
         ax.set_yticklabels(configs['list'])
 
@@ -97,7 +109,7 @@ def plot_adj_mat(synapse_graph, configs):  # A, configs, g):
     elif configs['analysis_type'] == 'adj_plot_some':
         mat = nx.to_numpy_matrix(graph, nodelist=configs['list'])
         ax.set_xticks(np.arange(len(configs['list'])))
-        ax.set_xticklabels(configs['list'], rotation=75)
+        ax.set_xticklabels(configs['list'], rotation=90)
         ax.set_yticks(np.arange(len(configs['list'])))
         ax.set_yticklabels(configs['list'])
 
