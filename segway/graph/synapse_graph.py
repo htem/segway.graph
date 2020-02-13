@@ -419,67 +419,67 @@ class SynapseGraph():
 
     def preprocess_graph(self):
         """If preprocessed graph is not existing or overwriting is on."""
-        if self.overwrite or not os.path.exists(self.output_graph_pp_path):
+        # if self.overwrite or not os.path.exists(self.output_graph_pp_path):
 
-            # Preprocessing the graph, given specifications in the config file
-            pre_proc = len(self.exclude_neurons) or len(self.tags_to_exclude) or len(self.exclude_edges)
-            if pre_proc:
+        # Preprocessing the graph, given specifications in the config file
+        pre_proc = len(self.exclude_neurons) or len(self.tags_to_exclude) or len(self.exclude_edges)
+        if pre_proc:
 
-                self.g.remove_nodes_from(self.exclude_neurons)
-                filtered_nodes = []
-                for tte in self.tags_to_exclude:
-                    filtered_nodes.extend([n for n, d in self.g.nodes(data=True) if d['cell_type'] == tte[0]
-                                          and tte[1] in d['tags']])
+            self.g.remove_nodes_from(self.exclude_neurons)
+            filtered_nodes = []
+            for tte in self.tags_to_exclude:
+                filtered_nodes.extend([n for n, d in self.g.nodes(data=True) if d['cell_type'] == tte[0]
+                                      and tte[1] in d['tags']])
 
-                self.g.remove_nodes_from(filtered_nodes)
+            self.g.remove_nodes_from(filtered_nodes)
 
-                print("Num of nodes (filtered): ", self.g.number_of_nodes())
-
-                self.g.remove_edges_from(self.exclude_edges)
-
-            # rename nodes and overwrite the name of the nodes
-            # NOTE : finished tag will be added only to interneuorns with no cell type specified,
-            # if instead the cell type is specified (eg basket) the rename will be basket_ and it
-            # assumes the interneuron finished
-
-            if len(self.rename_rules):
-                rename_dict = dict()
-
-                for rule in self.rename_rules:
-                    # rule to query the node of interest
-                    query = rule[2]
-                    if len(query) == 0:
-                        # direct rename
-                        rename_dict[rule[0]] = rule[1]
-                        continue
-
-                    elif len(query) == 1:
-                        # cell type is specifies (example interneuron_ -> basket_)
-                        queried_nodes = [n for n, d in self.g.nodes(data=True) if d[list(query.keys())[0]] == list(query.values())[0]]
-                    else:
-                        # e.g. specified cell type and finished tag
-                        nodes_dict = dict()
-                        for (n, d) in self.g.nodes(data=True):
-                            nodes_dict[n] = 0
-                            for k, v in query.items():
-                                if d[k] == v:
-                                    nodes_dict[n] += 1
-
-                        queried_nodes = list(dict(filter(lambda val: val[1] == 2, nodes_dict.items())).keys())
-
-                    for node in queried_nodes:
-
-                        if node.find(rule[0]) == 0:
-                            rename_dict[node] = node.replace(node[:len(rule[0])], rule[1], 1)
-
-                self.g = nx.relabel_nodes(self.g, rename_dict)
-
-            nx.write_gpickle(self.g, self.output_graph_pp_path)
-
-        else:
-
-            self.g = nx.read_gpickle(self.output_graph_pp_path)
             print("Num of nodes (filtered): ", self.g.number_of_nodes())
+
+            self.g.remove_edges_from(self.exclude_edges)
+
+        # rename nodes and overwrite the name of the nodes
+        # NOTE : finished tag will be added only to interneuorns with no cell type specified,
+        # if instead the cell type is specified (eg basket) the rename will be basket_ and it
+        # assumes the interneuron finished
+
+        if len(self.rename_rules):
+            rename_dict = dict()
+
+            for rule in self.rename_rules:
+                # rule to query the node of interest
+                query = rule[2]
+                if len(query) == 0:
+                    # direct rename
+                    rename_dict[rule[0]] = rule[1]
+                    continue
+
+                elif len(query) == 1:
+                    # cell type is specifies (example interneuron_ -> basket_)
+                    queried_nodes = [n for n, d in self.g.nodes(data=True) if d[list(query.keys())[0]] == list(query.values())[0]]
+                else:
+                    # e.g. specified cell type and finished tag
+                    nodes_dict = dict()
+                    for (n, d) in self.g.nodes(data=True):
+                        nodes_dict[n] = 0
+                        for k, v in query.items():
+                            if d[k] == v:
+                                nodes_dict[n] += 1
+
+                    queried_nodes = list(dict(filter(lambda val: val[1] == 2, nodes_dict.items())).keys())
+
+                for node in queried_nodes:
+
+                    if node.find(rule[0]) == 0:
+                        rename_dict[node] = node.replace(node[:len(rule[0])], rule[1], 1)
+
+            self.g = nx.relabel_nodes(self.g, rename_dict)
+
+        nx.write_gpickle(self.g, self.output_graph_pp_path)
+
+        # else:
+
+        #     self.g = nx.read_gpickle(self.output_graph_pp_path)
+        #     print("Num of nodes (filtered): ", self.g.number_of_nodes())
 
     def save_user_edges_debug(self):
         if self.debug_edges_list is not None and \

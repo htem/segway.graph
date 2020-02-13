@@ -47,19 +47,10 @@ def plot_adj_mat(synapse_graph, configs):  # A, configs, g):
     ax = fig.add_subplot(111)
 
     if configs['analysis_type'] == 'adj_plot_all':
-        # mat = A
-        # mat, pre_list = remove_presynapse_exclusion_list(mat, synapse_graph, full_list)
-        # mat, post_list = remove_postsynapse_exclusion_list(mat, synapse_graph, full_list)
 
         pre_list, post_list = remove_exclusion_list(synapse_graph, full_list)
-        print("pre_list:", pre_list)
-        print("post_list:", post_list)
-        print("full_list:", full_list)
-        print([full_list.index(i) for i in pre_list])
-        # mat = A[
-        #     [full_list.index(i) for i in post_list],
-        #     [full_list.index(i) for i in pre_list]
-        # ]
+        pre_list = sorted(pre_list)
+        post_list = sorted(post_list)
         mat = A[
             [full_list.index(i) for i in pre_list], :
         ]
@@ -68,14 +59,16 @@ def plot_adj_mat(synapse_graph, configs):  # A, configs, g):
         ]
 
         ax.set_xticks(np.arange(mat.shape[1]))
-        ax.set_xticklabels(post_list, rotation=75)
+        ax.set_xticklabels(post_list, rotation=90)
         ax.set_yticks(np.arange(mat.shape[0]))
         ax.set_yticklabels(pre_list)
+
+        ax.grid(True, alpha=0.2)
 
     elif configs['analysis_type'] == 'adj_plot_pre':
         mat = A[:, [full_list.index(i) for i in configs['list']]]
         ax.set_xticks(np.arange(mat.shape[1]))
-        ax.set_xticklabels(configs['list'], rotation=75)
+        ax.set_xticklabels(configs['list'], rotation=90)
         ax.set_yticks(np.arange(mat.shape[0]))
         ax.set_yticklabels(full_list)
 
@@ -86,7 +79,7 @@ def plot_adj_mat(synapse_graph, configs):  # A, configs, g):
     elif configs['analysis_type'] == 'adj_plot_post':
         mat = A[[full_list.index(i) for i in configs['list']], :]
         ax.set_xticks(np.arange(mat.shape[1]))
-        ax.set_xticklabels(full_list, rotation=75)
+        ax.set_xticklabels(full_list, rotation=90)
         ax.set_yticks(np.arange(mat.shape[0]))
         ax.set_yticklabels(configs['list'])
 
@@ -97,7 +90,7 @@ def plot_adj_mat(synapse_graph, configs):  # A, configs, g):
     elif configs['analysis_type'] == 'adj_plot_some':
         mat = nx.to_numpy_matrix(graph, nodelist=configs['list'])
         ax.set_xticks(np.arange(len(configs['list'])))
-        ax.set_xticklabels(configs['list'], rotation=75)
+        ax.set_xticklabels(configs['list'], rotation=90)
         ax.set_yticks(np.arange(len(configs['list'])))
         ax.set_yticklabels(configs['list'])
 
