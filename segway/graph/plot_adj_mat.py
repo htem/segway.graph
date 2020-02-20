@@ -40,12 +40,14 @@ def remove_exclusion_list(synapse_graph, pre, post):
 
 class PlotConfig():
 
-    def __init__(self, configs, full_list=None, dir=None, synapse_graph=None):
+    def __init__(
+            self, configs, full_list=None, dir=None, synapse_graph=None,
+            plot_type='default'):
 
-        self.threshold_min = configs.get('weights_threshold_min', 1)
-        self.threshold_max = configs.get('weights_threshold_max', 6)
+        self.threshold_min = configs.get('weights_threshold_min', None)
+        self.threshold_max = configs.get('weights_threshold_max', None)
 
-        self.plot_type = configs.get('plot_type', None)
+        # self.plot_type = configs.get('plot_type', None)
         self.save_edges_to_csv = configs.get('save_edges_to_csv', True)
 
         full_list = configs.get('full_list', configs.get('list', full_list))
@@ -53,14 +55,15 @@ class PlotConfig():
         self.pre_list = configs.get('pre_list', full_list)
         self.post_list = configs.get('post_list', full_list)
 
-        self.fname = configs.get('fname', 'adj')
+        self.fname = configs.get('fname', plot_type)
 
         self.sort = configs.get('sort', 'labels')
 
         self.synapse_graph = synapse_graph
 
     def get_output_fname(self, arg):
-        arg = arg + '_min_' + str(self.threshold_min)
+        if self.threshold_min:
+            arg = arg + '_min_' + str(self.threshold_min)
         return self.synapse_graph.get_output_fname(arg)
 
 
@@ -79,7 +82,8 @@ def plot_adj_mat(synapse_graph, configs):
     graph = synapse_graph.get_graph()
     full_list = list(graph.nodes())
     plot_config = PlotConfig(
-        configs, full_list=full_list, dir=synapse_graph.output_dir, synapse_graph=synapse_graph)
+        configs, full_list=full_list, dir=synapse_graph.output_dir, synapse_graph=synapse_graph,
+        plot_type='adj_plot')
     A = copy.deepcopy(synapse_graph.get_matrix())  # need to preserve A for subsequent plots
 
     if plot_config.threshold_min is not None or plot_config.threshold_max is not None:
