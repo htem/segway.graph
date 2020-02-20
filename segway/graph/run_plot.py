@@ -1,7 +1,7 @@
 import sys
 import json
 
-from segway.graph.synapse_graph import SynapseGraph
+from segway.graph.neuron_graph import NeuronGraph
 from segway.graph.plot_adj_mat import plot_adj_mat
 
 
@@ -15,7 +15,7 @@ if __name__ == '__main__':
     if len(sys.argv) == 3 and sys.argv[2] == "--overwrite":
         overwrite = True
 
-    g = SynapseGraph(config_f, overwrite=overwrite)
+    g = NeuronGraph(config_f, overwrite=overwrite)
 
     if 'debug_edges' in config and config['debug_edges']:
         g.save_user_edges_debug()  # debug specified edges
@@ -24,4 +24,4 @@ if __name__ == '__main__':
         # print(config['plots'])
         for plot_config in config['plots']:
             print("Plotting", plot_config)
-            plot_adj_mat(g, plot_config, 'patterns')
+            plot_adj_mat(g, plot_config)

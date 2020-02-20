@@ -6,7 +6,7 @@ import sys
 import json
 import time
 from collections import defaultdict
-
+from ast import literal_eval
 import pandas as pd
 
 from database_synapses import SynapseDatabase
@@ -20,7 +20,7 @@ import segwaytool.proofreading.neuron_db_server
 logger = logging.getLogger(__name__)
 
 
-class SynapseGraph():
+class NeuronGraph():
     """SynapseGraph allows the creation of the graph.
 
     Also outputs and plots are generated.
@@ -40,12 +40,13 @@ class SynapseGraph():
 
         self.__connect_DBs()
         self.create_graph()
+        self.__check_existing_graph()
         self.preprocess_graph()
 
         self.A = nx.to_numpy_matrix(self.g)
 
     def __initialize_configs(self, input_file):
-        '''Initialize default values'''
+        """Initialize default values."""
         # create output directory with same name of config file
         self.directory = (self.config_file[:-5])  # exclude format
         # self.overwrite = False
@@ -82,7 +83,7 @@ class SynapseGraph():
         # print(self.debug_edges_list)
 
     def __read_configs(self, input_file):
-        '''Recursively read configs from given JSON file'''
+        """Recursively read configs from given JSON file."""
         logger.info("Parsing configuration from %s" % input_file)
         with open(input_file) as f:
             params = json.load(f)
@@ -108,6 +109,88 @@ class SynapseGraph():
                 setattr(self, key, params[key])
             # if key == 'debug_edges_list':
             #     print(self.debug_edges_list)
+
+    def __check_existing_graph(self):
+        """Check existing graph.
+
+        If it was already stored and update if
+        the user-specified neurons list is different from the existing one.
+        """
+        logger.info("Checking existing graph...")
+        check = True
+        exist_nodes_list = list(self.g.nodes())
+        if len(self.neurons_list) == len(exist_nodes_list):
+            if sorted(self.neurons_list) == sorted(exist_nodes_list):
+                check = False
+            else:
+                print("ERROR:")
+                print("Input list has the same length of the existing graph but not correspodence!")
+                exit()
+
+        if check:
+            if len(self.neurons_list) <= len(exist_nodes_list):
+                print("ERROR:")
+                print("len(input_list) <= number of existing nodes")
+                print("Input nodes must be more than the existing nodes! Exiting...")
+                exit()
+            # assert len(self.neurons_list) > len(exist_nodes_list)
+            new_neurons = [nn for nn in self.neurons_list if nn not in exist_nodes_list]
+
+            # add nodes with attributes
+            attr = {}
+            print("Adding new neurons:")
+            for nn in new_neurons:
+                print(nn)
+                neuron = self.neuron_db.get_neuron(nn).to_json()
+                # create dictionary with attributes per neuron
+                attr = dict()
+                attr['cell_type'] = neuron['cell_type']
+                attr['x'] = neuron['soma_loc']['x']
+                attr['y'] = neuron['soma_loc']['y']
+                attr['z'] = neuron['soma_loc']['z']
+                attr['tags'] = neuron['tags']
+                attr['finished'] = neuron['finished']
+
+                self.g.add_node(nn, attr_dict=attr)
+
+            # update useful dictionary with superfragments
+            self.neurons_dict_sf = self.create_neurons_dict_sf()
+            self.sf_to_neurons = self.create_sf_dict_neurons()
+
+            for nn in new_neurons:
+                el, sl = self.directed_edges_sf(nn)
+
+            el = list(el)
+            # query only new synapses
+            new_syn_dict = self.create_syns_dict(sl)
+
+            # Pre-processing if user specified synapses location to exclude
+            # (only new synapses are considered)
+            if len(self.exclude_synapses):
+                print("### Info: deleting false synapses ...")
+                for es in self.exclude_synapses:
+                    to_del = dict(filter(lambda elem: elem[1]['syn_loc'] == es, new_syn_dict.items()))
+
+                    for k, v in to_del.items():
+                        new_syn_dict.pop(k)
+
+            weights, fil_edge_list, syns_locs = self.compute_weights(new_syn_dict, el)
+            self.edge_list.extend(fil_edge_list)
+            tot_weights = list(self.edge_list_df['weight'])
+            tot_weights.extend(weights)
+            self.weights = tot_weights
+            old_syns_locs = [literal_eval(sloc) for sloc in self.edge_list_df.loc[:,'synapses_locs'].values]
+            old_syns_locs.extend(syns_locs)
+            self.synapses_locs = old_syns_locs
+            # save outputs: FILE edges
+            self.edge_list_df = self.save_edges()
+
+            # add edges in the graph
+            for i in range(len(fil_edge_list)):
+                self.g.add_edge(fil_edge_list[i][0], fil_edge_list[i][1], weight=weights[i])
+
+            # save graph
+            nx.write_gpickle(self.g, self.output_graph_path)
 
     def __connect_DBs(self):
 
@@ -186,50 +269,54 @@ class SynapseGraph():
 
         return sfs_dict
 
+    def directed_edges_sf(self, nid, edge_list=set(), synapse_list=set()):
+        """Given a specific neuron id nid, it looks for all possible edges."""
+        sfs_dict = self._get_superfragments_info_db(self.neurons_dict_sf[nid])
+        for sf in sfs_dict:
+
+            post_partners_sf = sf['post_partners']
+            # print("post_partners_sf:", post_partners_sf)
+            for post_sf in post_partners_sf:
+                if post_sf not in self.sf_to_neurons:
+                    # post neuron not in input list
+                    continue
+                post_neuron = self.sf_to_neurons[post_sf]
+                if post_neuron != nid:
+                    edge_list.add((nid, post_neuron))
+
+            pre_partners_sf = sf['pre_partners']
+            # print("pre_partners_sf:", pre_partners_sf)
+            for pre_sf in pre_partners_sf:
+                if pre_sf not in self.sf_to_neurons:
+                    # post neuron not in input list
+                    continue
+                pre_neuron = self.sf_to_neurons[pre_sf]
+                if pre_neuron != nid:
+                    edge_list.add((pre_neuron, nid))
+
+            synapse_list.update(sf['syn_ids'])
+
+        return edge_list, synapse_list
+
     def create_edges_list(self):
         """Create edges and synapses lsit."""
         neuron_list = np.array(list(self.neurons_dict_sf.keys()))  # all neurons
-        edge_list = set()
-        synapse_list = set()
 
         for nid in neuron_list:
             # for each neuron, we get their post partners as sf
             # convert them to neuron_id and add directed edge
-
-            sfs_dict = self._get_superfragments_info_db(self.neurons_dict_sf[nid])
-            for sf in sfs_dict:
-
-                post_partners_sf = sf['post_partners']
-                # print("post_partners_sf:", post_partners_sf)
-                for post_sf in post_partners_sf:
-                    if post_sf not in self.sf_to_neurons:
-                        # post neuron not in input list
-                        continue
-                    post_neuron = self.sf_to_neurons[post_sf]
-                    if post_neuron != nid:
-                        edge_list.add((nid, post_neuron))
-
-                pre_partners_sf = sf['pre_partners']
-                # print("pre_partners_sf:", pre_partners_sf)
-                for pre_sf in pre_partners_sf:
-                    if pre_sf not in self.sf_to_neurons:
-                        # post neuron not in input list
-                        continue
-                    pre_neuron = self.sf_to_neurons[pre_sf]
-                    if pre_neuron != nid:
-                        edge_list.add((pre_neuron, nid))
-
-                synapse_list.update(sf['syn_ids'])
+            edge_list, synapse_list = self.directed_edges_sf(nid)
 
         edge_list = list(edge_list)
+
         return edge_list, synapse_list
 
-    def create_syns_dict(self):
+    def create_syns_dict(self, synapses_list):
         """Given the list of synapses : a dictionary is created as query result."""
         # get synapse attributes
         print("###: Info: querying synapses DB")
         start = time.time()
-        query = {'$and': [{'id': {'$in': list(self.synapse_list)}},
+        query = {'$and': [{'id': {'$in': list(synapses_list)}},
                 {'score': {'$gt': self.syn_score_threshold}}]}
 
         # query = {'id' : { '$in' : list(synapse_list) }}
@@ -255,7 +342,7 @@ class SynapseGraph():
 
         return syns_dict
 
-    def compute_weights(self):
+    def compute_weights(self, syns_dict, edge_list):
         """
         Compute weights according to the area of the synapse.
 
@@ -274,7 +361,7 @@ class SynapseGraph():
 
         synapses_dict = defaultdict(list)
 
-        for k, syn in self.syns_dict.items():
+        for k, syn in syns_dict.items():
             pre_neuron = syn['sf_pre']
             post_neuron = syn['sf_post']
             if pre_neuron not in self.sf_to_neurons or post_neuron not in self.sf_to_neurons:
@@ -305,9 +392,9 @@ class SynapseGraph():
 
         weights = []
         synapses_locs = []
-        filt_edge_list = self.edge_list.copy()
+        filt_edge_list = edge_list.copy()
 
-        for e in self.edge_list:
+        for e in edge_list:
             if e in syn_weights:
                 weights.append(syn_weights[e])
                 synapses_locs.append(synapses_dict[e])
@@ -349,23 +436,24 @@ class SynapseGraph():
         """Create the graph accessing DB or reading existing file."""
         # access the database and generate graph characteristics if it was not
         # already existing or if it was existing but overwrite option is True
+
+        # access the DB
+        self.__connect_DBs()
+
+        if self.input_method == 'user_list':
+            self.neurons_list = sorted(list(set(self.input_neurons_list)))
+        elif self.input_method == 'all':
+            # WARNING : in 'neuron_db_server.py' there is the limit of 10000 neurons
+            # so 10000 neurons will be queried
+            self.neurons_list = self.neuron_db.find_neuron({})
+        elif self.input_method == 'roi':
+            # query neurons if roi.contains(Coordinate(soma_loc))
+            # TO IMPLEMENT ...
+            pass
+
         if self.overwrite or not os.path.exists(self.output_graph_path):
             # assuming that if there is no output_graph there is no edge_list and
             # adjacency matrix saved either
-
-            # access the DB
-            self.__connect_DBs()
-
-            if self.input_method == 'user_list':
-                self.neurons_list = sorted(list(set(self.input_neurons_list)))
-            elif self.input_method == 'all':
-                # WARNING : in 'neuron_db_server.py' there is the limit of 10000 neurons
-                # so 10000 neurons will be queried
-                self.neurons_list = self.neuron_db.find_neuron({})
-            elif self.input_method == 'roi':
-                # query neurons if roi.contains(Coordinate(soma_loc))
-                # TO IMPLEMENT ...
-                pass
 
             self.nodes_attr = self._get_neurons_info_db()
             self.g = self.create_nodes_graph()
@@ -386,7 +474,7 @@ class SynapseGraph():
                 self.edge_list = list(set(self.edge_list))
                 print("### Info: Added edges specified by the user, len(edge_list) :", len(self.edge_list))
 
-            self.syns_dict = self.create_syns_dict()
+            self.syns_dict = self.create_syns_dict(self.synapse_list)
 
             # Pre-processing if user specified synapses location to exclude
             if len(self.exclude_synapses):
@@ -394,10 +482,11 @@ class SynapseGraph():
                 for es in self.exclude_synapses:
                     to_del = dict(filter(lambda elem: elem[1]['syn_loc'] == es, self.syns_dict.items()))
 
-                for k, v in to_del.items():
-                    self.syns_dict.pop(k)
+                    for k, v in to_del.items():
+                        self.syns_dict.pop(k)
 
-            self.weights, self.edge_list, self.synapses_locs = self.compute_weights()
+            self.weights, self.edge_list, self.synapses_locs = self.compute_weights(self.syns_dict,
+                                                                                    self.edge_list)
             print(" ### Info: len(weights) (filtered edge_list): ", len(self.edge_list))
 
             # save outputs: FILE edges

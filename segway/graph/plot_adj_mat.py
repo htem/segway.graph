@@ -7,10 +7,10 @@ from networkx.utils import reverse_cuthill_mckee_ordering
 import copy
 
 
-def remove_exclusion_list(synapse_graph, full_list):
+def remove_exclusion_list(neuron_graph, full_list):
     """Exclude specified nodes from Adj in config file."""
-    pre_exclusion_list = synapse_graph.get_presynapse_exclusion_list()
-    post_exclusion_list = synapse_graph.get_postsynapse_exclusion_list()
+    pre_exclusion_list = neuron_graph.get_presynapse_exclusion_list()
+    post_exclusion_list = neuron_graph.get_postsynapse_exclusion_list()
     pre_list = copy.deepcopy(full_list)
     post_list = copy.deepcopy(full_list)
     print(pre_list)
@@ -25,7 +25,7 @@ def remove_exclusion_list(synapse_graph, full_list):
     return pre_list, post_list
 
 
-def plot_adj_mat(synapse_graph, configs, sort_type=None):  # A, configs, g):
+def plot_adj_mat(neuron_graph, configs, sort_type=None):  # A, configs, g):
     """
     Plot Adj matrix according to the configs.
 
@@ -39,8 +39,8 @@ def plot_adj_mat(synapse_graph, configs, sort_type=None):  # A, configs, g):
     Note: If the threshold is present, all the plots will be done considering
     that threshold.
     """
-    A = synapse_graph.get_matrix()
-    graph = synapse_graph.get_graph()
+    A = neuron_graph.get_matrix()
+    graph = neuron_graph.get_graph()
 
     if 'weights_threshold_min' in configs:
         A[A < configs['weights_threshold_min']] = 0
@@ -62,7 +62,7 @@ def plot_adj_mat(synapse_graph, configs, sort_type=None):  # A, configs, g):
             if 'weights_threshold_max' in configs:
                 A[A > configs['weights_threshold_max']] = configs['weights_threshold_max']
 
-        pre_list, post_list = remove_exclusion_list(synapse_graph, full_list)
+        pre_list, post_list = remove_exclusion_list(neuron_graph, full_list)
         if sort_type == 'labels':
             pre_list = sorted(pre_list)
             post_list = sorted(post_list)
@@ -93,7 +93,7 @@ def plot_adj_mat(synapse_graph, configs, sort_type=None):  # A, configs, g):
 
         # save output file for synapses proofreading
         small_list = configs['list']
-        synapse_graph.debug_spec_edges(pre_list=small_list)
+        neuron_graph.debug_spec_edges(pre_list=small_list)
 
     elif configs['analysis_type'] == 'adj_plot_post':
         mat = A[[full_list.index(i) for i in configs['list']], :]
@@ -104,7 +104,7 @@ def plot_adj_mat(synapse_graph, configs, sort_type=None):  # A, configs, g):
 
         # save output file for synapses proofreading
         small_list = configs['list']
-        synapse_graph.debug_spec_edges(post_list=small_list)
+        neuron_graph.debug_spec_edges(post_list=small_list)
 
     elif configs['analysis_type'] == 'adj_plot_some':
         mat = nx.to_numpy_matrix(graph, nodelist=configs['list'])
@@ -115,7 +115,7 @@ def plot_adj_mat(synapse_graph, configs, sort_type=None):  # A, configs, g):
 
         # save output file for synapses proofreading
         small_list = configs['list']
-        synapse_graph.debug_spec_edges(pre_list=small_list, post_list=small_list)
+        neuron_graph.debug_spec_edges(pre_list=small_list, post_list=small_list)
 
     else:
         print("### Info: analysis_type specified not implemented! Exiting...")
@@ -123,4 +123,4 @@ def plot_adj_mat(synapse_graph, configs, sort_type=None):  # A, configs, g):
 
     i = ax.imshow(mat)
     plt.colorbar(i, ax=ax)
-    fig.savefig(synapse_graph.directory + '/' + configs['output_plot'])
+    fig.savefig(neuron_graph.directory + '/' + configs['output_plot'])
