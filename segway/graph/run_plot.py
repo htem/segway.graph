@@ -29,4 +29,8 @@ if __name__ == '__main__':
         # print(config['plots'])
         for plot_config in config['plots']:
             print("Plotting", plot_config)
-            plot_adj_mat(g, plot_config)
+            plot_type = config.get('analysis_type', 'adj_plot')
+            if plot_type == 'adj_plot':
+                plot_adj_mat(g, plot_config)
+            else:
+                raise RuntimeError("Analysis %s is not implemented" % plot_type)
