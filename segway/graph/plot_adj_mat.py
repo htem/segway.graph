@@ -80,15 +80,7 @@ def plot_adj_mat(synapse_graph, configs):
     full_list = list(graph.nodes())
     plot_config = PlotConfig(
         configs, full_list=full_list, dir=synapse_graph.output_dir, synapse_graph=synapse_graph)
-
-    if plot_config.sort == 'patterns':
-        ug = moral.moral_graph(graph)
-        rcm = list(reverse_cuthill_mckee_ordering(ug))
-        full_list = rcm
-        A = nx.adjacency_matrix(graph, nodelist=rcm).todense()
-    else:
-        A = copy.deepcopy(synapse_graph.get_matrix())  # need to preserve A for subsequent plots
-        # full_list = synapse_graph.get_neurons_list()
+    A = copy.deepcopy(synapse_graph.get_matrix())  # need to preserve A for subsequent plots
 
     if plot_config.threshold_min is not None or plot_config.threshold_max is not None:
         if plot_config.threshold_min is not None:
@@ -101,11 +93,18 @@ def plot_adj_mat(synapse_graph, configs):
     pre_list, post_list = remove_exclusion_list(synapse_graph, pre_list, post_list)
 
     if plot_config.sort is not None:
-        if plot_config.sort == 'labels':
+        if plot_config.sort == 'patterns':
+            ug = moral.moral_graph(graph)
+            rcm = list(reverse_cuthill_mckee_ordering(ug))
+            pre_list = [n for n in rcm if n in pre_list]
+            post_list = [n for n in rcm if n in post_list]
+            # pre_list = full_list
+        elif plot_config.sort == 'labels':
             pre_list = sorted(pre_list, key=natural_keys)
             post_list = sorted(post_list, key=natural_keys)
         elif plot_config.sort == 'sort':
-            assert False, "This option does not sort labels yet"
+            assert False, "This option is not properly implemented"
+            # TODO: need to also sort labels along with mat
             mat = np.sort(mat)
         else:
             # prelist and postlist should have the same order as the full list
