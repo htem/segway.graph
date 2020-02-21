@@ -76,9 +76,6 @@ class GraphAnalysis():
     def plot_graphs(self):
         """Plot graphs in networkx and graph-tool according to the specified configs"""
 
-
-
-
 if __name__ == '__main__':
 
     assert len(sys.argv) == 2
