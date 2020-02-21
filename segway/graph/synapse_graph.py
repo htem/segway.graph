@@ -57,6 +57,7 @@ class SynapseGraph():
         config_name = config_name.split('.')[0]
         output_dir = os.path.join(output_dir, config_name)
 
+        self.csv_output_dir = None
         self.output_dir = output_dir
         self.config_name = config_name
         self.output_prepend_config_name = False
@@ -91,6 +92,11 @@ class SynapseGraph():
             basename = self.config_name + '_' + basename
         return os.path.join(self.output_dir, basename)
 
+    def get_output_csv_fname(self, basename):
+        if self.output_prepend_config_name:
+            basename = self.config_name + '_' + basename
+        return os.path.join(self.csv_output_dir, basename)
+
     def __check_configs(self):
 
         # make sure that essential params are defined
@@ -102,6 +108,8 @@ class SynapseGraph():
             assert hasattr(self, p), "Paramter %s was not defined in config" % p
 
         # print(self.debug_edges_list)
+        if self.csv_output_dir is None:
+            self.csv_output_dir = os.path.join(self.output_dir, 'edge_csv')
 
     def __read_configs(self, input_file):
         """Recursively read configs from given JSON file."""

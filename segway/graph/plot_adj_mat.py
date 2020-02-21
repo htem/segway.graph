@@ -61,10 +61,17 @@ class PlotConfig():
 
         self.synapse_graph = synapse_graph
 
+        self.also_plot_transposed = configs.get('also_plot_transposed', False)
+
     def get_output_fname(self, arg):
         if self.threshold_min:
             arg = arg + '_min_' + str(self.threshold_min)
         return self.synapse_graph.get_output_fname(arg)
+
+    def get_output_csv_fname(self, arg):
+        if self.threshold_min:
+            arg = arg + '_min_' + str(self.threshold_min)
+        return self.synapse_graph.get_output_csv_fname(arg)
 
 
 def plot_adj_mat(synapse_graph, configs):
@@ -123,7 +130,8 @@ def plot_adj_mat(synapse_graph, configs):
     ]
 
     _plot_adj_mat(mat, pre_list, post_list, plot_config, synapse_graph, transposed=False, colorbar=plot_config.colorbar)
-    _plot_adj_mat(mat, pre_list, post_list, plot_config, synapse_graph, transposed=True, colorbar=plot_config.colorbar)
+    if plot_config.also_plot_transposed:
+        _plot_adj_mat(mat, pre_list, post_list, plot_config, synapse_graph, transposed=True, colorbar=plot_config.colorbar)
 
 
 def _plot_adj_mat(
@@ -164,4 +172,4 @@ def _plot_adj_mat(
     fig.savefig(plot_config.get_output_fname(fname))
 
     if plot_config.save_edges_to_csv:
-        synapse_graph.save_edges_to_csv(pre_list, post_list, plot_config.get_output_fname(fname))
+        synapse_graph.save_edges_to_csv(pre_list, post_list, plot_config.get_output_csv_fname(fname))
