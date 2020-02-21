@@ -73,6 +73,11 @@ class GraphAnalysis():
                 # initialize or overwrite value
                 setattr(self, key, params[key])
 
+    def plot_graphs(self):
+        """Plot graphs in networkx and graph-tool according to the specified configs"""
+
+
+
 
 if __name__ == '__main__':
 
