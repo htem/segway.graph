@@ -1,86 +1,31 @@
-import os
+
 import numpy as np
 import matplotlib.pyplot as plt
-# import networkx as nx
-import copy
-import re
-
 import networkx as nx
 from networkx.algorithms import moral
 from networkx.utils import reverse_cuthill_mckee_ordering
-
-<<<<<<< HEAD
-=======
-
-def atoi(text):
-    return int(text) if text.isdigit() else text
->>>>>>> a33ff23cf6f12d06a78e825c49490290f417807f
-
-def atoi(text):
-    return int(text) if text.isdigit() else text
-
-<<<<<<< HEAD
-
-=======
->>>>>>> a33ff23cf6f12d06a78e825c49490290f417807f
-def natural_keys(text):
-    '''
-    alist.sort(key=natural_keys) sorts in human order
-    http://nedbatchelder.com/blog/200712/human_sorting.html
-    (See Toothy's implementation in the comments)
-    '''
-    return [atoi(c) for c in re.split(r'(\d+)', text)]
+import copy
 
 
-def remove_exclusion_list(synapse_graph, pre, post):
+def remove_exclusion_list(synapse_graph, full_list):
+    """Exclude specified nodes from Adj in config file."""
     pre_exclusion_list = synapse_graph.get_presynapse_exclusion_list()
     post_exclusion_list = synapse_graph.get_postsynapse_exclusion_list()
-    pre_list = copy.deepcopy(pre)
-    post_list = copy.deepcopy(post)
+    pre_list = copy.deepcopy(full_list)
+    post_list = copy.deepcopy(full_list)
+    print(pre_list)
+    print(post_list)
     for n in pre_exclusion_list:
-        if n in pre_list:
-            pre_list.remove(n)
+        print(n)
+        pre_list.remove(n)
     for n in post_exclusion_list:
-        if n in post_list:
-            post_list.remove(n)
+        print(n)
+        post_list.remove(n)
 
     return pre_list, post_list
 
 
-class PlotConfig():
-
-    def __init__(
-            self, configs, full_list=None, dir=None, synapse_graph=None,
-            plot_type='default'):
-
-        self.threshold_min = configs.get('weights_threshold_min', None)
-        self.threshold_max = configs.get('weights_threshold_max', None)
-<<<<<<< HEAD
-        self.colorbar = configs.get('colorbar', False)
-=======
-
->>>>>>> a33ff23cf6f12d06a78e825c49490290f417807f
-        # self.plot_type = configs.get('plot_type', None)
-        self.save_edges_to_csv = configs.get('save_edges_to_csv', True)
-
-        full_list = configs.get('full_list', configs.get('list', full_list))
-        assert full_list is not None
-        self.pre_list = configs.get('pre_list', full_list)
-        self.post_list = configs.get('post_list', full_list)
-
-        self.fname = configs.get('fname', plot_type)
-
-        self.sort = configs.get('sort', 'labels')
-
-        self.synapse_graph = synapse_graph
-
-    def get_output_fname(self, arg):
-        if self.threshold_min:
-            arg = arg + '_min_' + str(self.threshold_min)
-        return self.synapse_graph.get_output_fname(arg)
-
-
-def plot_adj_mat(synapse_graph, configs):
+def plot_adj_mat(synapse_graph, configs, sort_type=None):  # A, configs, g):
     """
     Plot Adj matrix according to the configs.
 
@@ -88,106 +33,94 @@ def plot_adj_mat(synapse_graph, configs):
     ['full', 'some', 'pre', 'post', 'threshold_value'(int/float)];
     - the output paths are the values of the dict;
     configs values will include the list of neuorns of interest.
-
-    If the threshold is present, all the plots will be done considering
+    - sort_type sorts the matrix according to the specified type;
+    if not None, it can be 'labels', 'patterns', 'sort'. If the type is patterns,
+    the graph will be converted into an undirected graph to find blocks.
+    Note: If the threshold is present, all the plots will be done considering
     that threshold.
     """
+    A = synapse_graph.get_matrix()
     graph = synapse_graph.get_graph()
+
+    if 'weights_threshold_min' in configs:
+        A[A < configs['weights_threshold_min']] = 0
+    if 'weights_threshold_max' in configs:
+        A[A > configs['weights_threshold_max']] = configs['weights_threshold_max']
+
     full_list = list(graph.nodes())
-    plot_config = PlotConfig(
-        configs, full_list=full_list, dir=synapse_graph.output_dir, synapse_graph=synapse_graph,
-        plot_type='adj_plot')
-    A = copy.deepcopy(synapse_graph.get_matrix())  # need to preserve A for subsequent plots
-
-    if plot_config.threshold_min is not None or plot_config.threshold_max is not None:
-        if plot_config.threshold_min is not None:
-            A[A < plot_config.threshold_min] = 0
-        if plot_config.threshold_max is not None:
-            A[A > plot_config.threshold_max] = plot_config.threshold_max
-
-    pre_list = synapse_graph.rename_list(plot_config.pre_list)
-    post_list = synapse_graph.rename_list(plot_config.post_list)
-    pre_list, post_list = remove_exclusion_list(synapse_graph, pre_list, post_list)
-
-    if plot_config.sort is not None:
-        if plot_config.sort == 'patterns':
-            ug = moral.moral_graph(graph)
-            rcm = list(reverse_cuthill_mckee_ordering(ug))
-            pre_list = [n for n in rcm if n in pre_list]
-            post_list = [n for n in rcm if n in post_list]
-            # pre_list = full_list
-        elif plot_config.sort == 'labels':
-            pre_list = sorted(pre_list, key=natural_keys)
-            post_list = sorted(post_list, key=natural_keys)
-        elif plot_config.sort == 'sort':
-            assert False, "This option is not properly implemented"
-            # TODO: need to also sort labels along with mat
-            mat = np.sort(mat)
-        else:
-            # prelist and postlist should have the same order as the full list
-            pre_list = [n for n in full_list if n in pre_list]
-            post_list = [n for n in full_list if n in post_list]
-
-    mat = A[
-        [full_list.index(name) for name in pre_list], :
-    ]
-    mat = mat[
-        :, [full_list.index(name) for name in post_list]
-    ]
-
-<<<<<<< HEAD
-    _plot_adj_mat(mat, pre_list, post_list, plot_config, synapse_graph, transposed=False, colorbar=plot_config.colorbar)
-    _plot_adj_mat(mat, pre_list, post_list, plot_config, synapse_graph, transposed=True, colorbar=plot_config.colorbar)
-=======
-    _plot_adj_mat(mat, pre_list, post_list, plot_config, synapse_graph, transposed=False)
-    _plot_adj_mat(mat, pre_list, post_list, plot_config, synapse_graph, transposed=True)
->>>>>>> a33ff23cf6f12d06a78e825c49490290f417807f
-
-
-def _plot_adj_mat(
-        mat, pre_list, post_list, plot_config,
-<<<<<<< HEAD
-        synapse_graph, transposed=False, colorbar=False):
-=======
-        synapse_graph, transposed=False):
->>>>>>> a33ff23cf6f12d06a78e825c49490290f417807f
-
-    # fig = plt.figure(figsize=(16, 15))
-    fig = plt.figure(figsize=(14.5, 14.5))
+    fig = plt.figure(figsize=(16, 15))
     ax = fig.add_subplot(111)
 
-    if transposed:
-        post_list0 = post_list
-        post_list = pre_list
-        pre_list = post_list0
-        mat = mat.transpose()
+    if configs['analysis_type'] == 'adj_plot_all':
+        if sort_type == 'patterns':
+            ug = moral.moral_graph(graph)
+            rcm = list(reverse_cuthill_mckee_ordering(ug))
+            full_list = rcm
+            A = nx.adjacency_matrix(graph, nodelist=rcm).todense()
+            if 'weights_threshold_min' in configs:
+                A[A < configs['weights_threshold_min']] = 0
+            if 'weights_threshold_max' in configs:
+                A[A > configs['weights_threshold_max']] = configs['weights_threshold_max']
 
-    ax.set_xticks(range(mat.shape[1]), minor=True)
-    ax.set_xticklabels(post_list, rotation=90, minor=True)
-    ax.set_yticks(range(mat.shape[0]), minor=True)
-    ax.set_yticklabels(pre_list, minor=True)
+        pre_list, post_list = remove_exclusion_list(synapse_graph, full_list)
+        if sort_type == 'labels':
+            pre_list = sorted(pre_list)
+            post_list = sorted(post_list)
 
-    ax.set_yticks(range(0, mat.shape[0], 5), minor=False)
-    ax.set_yticklabels([], minor=False)
-    ax.set_xticks(range(0, mat.shape[1], 5), minor=False)
-    ax.set_xticklabels([], minor=False)
-    ax.grid(True, which='major', alpha=0.5)
-    ax.grid(True, which='minor', alpha=0.2)
-    ax.tick_params(axis='both', which='both', labelsize=8)
+        mat = A[
+            [full_list.index(i) for i in pre_list], :
+        ]
+        mat = mat[
+            :, [full_list.index(i) for i in post_list]
+        ]
+
+        if sort_type == 'sort':
+            mat = np.sort(mat)
+
+        ax.set_xticks(np.arange(mat.shape[1]))
+        ax.set_xticklabels(post_list, rotation=90)
+        ax.set_yticks(np.arange(mat.shape[0]))
+        ax.set_yticklabels(pre_list)
+
+        ax.grid(True, alpha=0.2)
+
+    elif configs['analysis_type'] == 'adj_plot_pre':
+        mat = A[:, [full_list.index(i) for i in configs['list']]]
+        ax.set_xticks(np.arange(mat.shape[1]))
+        ax.set_xticklabels(configs['list'], rotation=90)
+        ax.set_yticks(np.arange(mat.shape[0]))
+        ax.set_yticklabels(full_list)
+
+        # save output file for synapses proofreading
+        small_list = configs['list']
+        synapse_graph.debug_spec_edges(pre_list=small_list)
+
+    elif configs['analysis_type'] == 'adj_plot_post':
+        mat = A[[full_list.index(i) for i in configs['list']], :]
+        ax.set_xticks(np.arange(mat.shape[1]))
+        ax.set_xticklabels(full_list, rotation=90)
+        ax.set_yticks(np.arange(mat.shape[0]))
+        ax.set_yticklabels(configs['list'])
+
+        # save output file for synapses proofreading
+        small_list = configs['list']
+        synapse_graph.debug_spec_edges(post_list=small_list)
+
+    elif configs['analysis_type'] == 'adj_plot_some':
+        mat = nx.to_numpy_matrix(graph, nodelist=configs['list'])
+        ax.set_xticks(np.arange(len(configs['list'])))
+        ax.set_xticklabels(configs['list'], rotation=90)
+        ax.set_yticks(np.arange(len(configs['list'])))
+        ax.set_yticklabels(configs['list'])
+
+        # save output file for synapses proofreading
+        small_list = configs['list']
+        synapse_graph.debug_spec_edges(pre_list=small_list, post_list=small_list)
+
+    else:
+        print("### Info: analysis_type specified not implemented! Exiting...")
+        exit()
+
     i = ax.imshow(mat)
-<<<<<<< HEAD
-    if colorbar:
-        plt.colorbar(i, ax=ax)
-=======
-    # plt.colorbar(i, ax=ax)
->>>>>>> a33ff23cf6f12d06a78e825c49490290f417807f
-    plt.tight_layout()
-    # fig.savefig(synapse_graph.output_dir + '/' + configs['output_plot'])
-
-    fname = plot_config.fname
-    if transposed:
-        fname = fname + '_transposed'
-    fig.savefig(plot_config.get_output_fname(fname))
-
-    if plot_config.save_edges_to_csv:
-        synapse_graph.save_edges_to_csv(pre_list, post_list, plot_config.get_output_fname(fname))
+    plt.colorbar(i, ax=ax)
+    fig.savefig(synapse_graph.directory + '/' + configs['output_plot'])
