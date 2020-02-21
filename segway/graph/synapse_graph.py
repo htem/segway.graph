@@ -5,9 +5,11 @@ import os
 import sys
 import json
 import time
+from io import StringIO
 from collections import defaultdict
 from ast import literal_eval
 import pandas as pd
+from jsmin import jsmin
 
 from database_synapses import SynapseDatabase
 from database_superfragments import SuperFragmentDatabase
@@ -20,7 +22,7 @@ import segwaytool.proofreading.neuron_db_server
 logger = logging.getLogger(__name__)
 
 
-class NeuronGraph():
+class SynapseGraph():
     """SynapseGraph allows the creation of the graph.
 
     Also outputs and plots are generated.
@@ -36,7 +38,7 @@ class NeuronGraph():
 
         self.overwrite = overwrite
 
-        os.makedirs(self.directory, exist_ok=True)
+        os.makedirs(self.output_dir, exist_ok=True)
 
         self.__connect_DBs()
         self.create_graph()
@@ -48,7 +50,17 @@ class NeuronGraph():
     def __initialize_configs(self, input_file):
         """Initialize default values."""
         # create output directory with same name of config file
-        self.directory = (self.config_file[:-5])  # exclude format
+
+        output_dir, config_name = os.path.split(self.config_file)
+        if output_dir == '':
+            output_dir = '.'
+        config_name = config_name.split('.')[0]
+        output_dir = os.path.join(output_dir, config_name)
+
+        self.output_dir = output_dir
+        self.config_name = config_name
+        self.output_prepend_config_name = False
+        self.graph_dir = output_dir
         # self.overwrite = False
         self.add_edge_list = []
         self.exclude_neurons = []
@@ -63,12 +75,21 @@ class NeuronGraph():
         self.presynapse_exclusion_list = []
         self.postsynapse_exclusion_list = []
 
-        # save output files names
-        self.output_graph_path = self.directory + '/output_graph.gpickle'
-        self.output_edges_path = self.directory + '/output_edges.csv'
-        # save if existing in config
-        self.output_graph_pp_path = self.directory + '/output_graph_pp.gpickle'
-        self.output_debug_edges_path = self.directory + '/output_debug_edges.csv'
+        self._named_lists = {}
+
+    def get_graph_file_path(self):
+        return os.path.join(self.graph_dir + '/output_graph.gpickle')
+
+    def get_edges_file_path(self):
+        return os.path.join(self.graph_dir + '/output_edges.csv')
+
+    def get_debug_edges_file_path(self):
+        return os.path.join(self.graph_dir + '/output_debug_edges.csv')
+
+    def get_output_fname(self, basename):
+        if self.output_prepend_config_name:
+            basename = self.config_name + '_' + basename
+        return os.path.join(self.output_dir, basename)
 
     def __check_configs(self):
 
@@ -85,8 +106,9 @@ class NeuronGraph():
     def __read_configs(self, input_file):
         """Recursively read configs from given JSON file."""
         logger.info("Parsing configuration from %s" % input_file)
-        with open(input_file) as f:
-            params = json.load(f)
+        with open(input_file) as js_file:
+            minified = jsmin(js_file.read())
+            params = json.load(StringIO(minified))
 
         if 'input_config_files' in params:
             if isinstance(params['input_config_files'], list):
@@ -96,9 +118,6 @@ class NeuronGraph():
                 self.__read_configs(params['input_config_files'])
 
         for key in params:
-            # if key == 'debug_edges_list':
-            #     print(self.debug_edges_list)
-            #     print(params[key])
             if hasattr(self, key) and isinstance(getattr(self, key), list):
                 # extend if parameter is a list
                 assert isinstance(params[key], list)
@@ -107,8 +126,10 @@ class NeuronGraph():
             else:
                 # initialize or overwrite value
                 setattr(self, key, params[key])
-            # if key == 'debug_edges_list':
-            #     print(self.debug_edges_list)
+
+        if 'named_lists' in params:
+            for l in params['named_lists']:
+                self._named_lists[l] = params['named_lists'][l]
 
     def __check_existing_graph(self):
         """Check existing graph.
@@ -117,23 +138,8 @@ class NeuronGraph():
         the user-specified neurons list is different from the existing one.
         """
         logger.info("Checking existing graph...")
-        check = True
         exist_nodes_list = list(self.g.nodes())
-        if len(self.neurons_list) == len(exist_nodes_list):
-            if sorted(self.neurons_list) == sorted(exist_nodes_list):
-                check = False
-            else:
-                print("ERROR:")
-                print("Input list has the same length of the existing graph but not correspodence!")
-                exit()
-
-        if check:
-            if len(self.neurons_list) <= len(exist_nodes_list):
-                print("ERROR:")
-                print("len(input_list) <= number of existing nodes")
-                print("Input nodes must be more than the existing nodes! Exiting...")
-                exit()
-            # assert len(self.neurons_list) > len(exist_nodes_list)
+        if not set(exist_nodes_list).issuperset(set(self.neurons_list)):
             new_neurons = [nn for nn in self.neurons_list if nn not in exist_nodes_list]
 
             # add nodes with attributes
@@ -190,7 +196,7 @@ class NeuronGraph():
                 self.g.add_edge(fil_edge_list[i][0], fil_edge_list[i][1], weight=weights[i])
 
             # save graph
-            nx.write_gpickle(self.g, self.output_graph_path)
+            nx.write_gpickle(self.g, self.get_graph_file_path())
 
     def __connect_DBs(self):
 
@@ -417,7 +423,7 @@ class NeuronGraph():
         df = pd.DataFrame(list(zip(edge_list[:, 0], edge_list[:, 1], self.weights,
                           self.synapses_locs)), columns=columns)
 
-        df.to_csv(self.output_edges_path)
+        df.to_csv(self.get_edges_file_path())
 
         return df
 
@@ -451,7 +457,7 @@ class NeuronGraph():
             # TO IMPLEMENT ...
             pass
 
-        if self.overwrite or not os.path.exists(self.output_graph_path):
+        if self.overwrite or not os.path.exists(self.get_graph_file_path()):
             # assuming that if there is no output_graph there is no edge_list and
             # adjacency matrix saved either
 
@@ -478,12 +484,15 @@ class NeuronGraph():
 
             # Pre-processing if user specified synapses location to exclude
             if len(self.exclude_synapses):
-                print("### Info: deleting false synapses ...")
+                count = 0
                 for es in self.exclude_synapses:
                     to_del = dict(filter(lambda elem: elem[1]['syn_loc'] == es, self.syns_dict.items()))
 
                     for k, v in to_del.items():
                         self.syns_dict.pop(k)
+                        count += 1
+
+                print("### Info: deleted %d false synapses..." % count)
 
             self.weights, self.edge_list, self.synapses_locs = self.compute_weights(self.syns_dict,
                                                                                     self.edge_list)
@@ -494,14 +503,14 @@ class NeuronGraph():
             # add edges in the graph
             self.create_edges_graph()
             # save graph
-            nx.write_gpickle(self.g, self.output_graph_path)
+            nx.write_gpickle(self.g, self.get_graph_file_path())
 
         else:
             # load graph, adj and edge list
-            self.g = nx.read_gpickle(self.output_graph_path)
+            self.g = nx.read_gpickle(self.get_graph_file_path())
             print("### Info: Graph loaded")
             print("Number of nodes: ", self.g.number_of_nodes())
-            self.edge_list_df = pd.read_csv(self.output_edges_path, index_col=0)  # with info on the weights and synapses
+            self.edge_list_df = pd.read_csv(self.get_edges_file_path(), index_col=0)  # with info on the weights and synapses
             # edge list names
             self.edge_list = list(zip(*map(self.edge_list_df.get, ['pre_partner', 'post_partner'])))
             print("### Info: edge_list loaded")
@@ -531,15 +540,18 @@ class NeuronGraph():
         # if instead the cell type is specified (eg basket) the rename will be basket_ and it
         # assumes the interneuron finished
 
+        self.rename_dict = dict()
+        self.rename_dict_reverse = dict()
         if len(self.rename_rules):
-            rename_dict = dict()
+            self.rename_dict = dict()
 
             for rule in self.rename_rules:
                 # rule to query the node of interest
                 query = rule[2]
                 if len(query) == 0:
                     # direct rename
-                    rename_dict[rule[0]] = rule[1]
+                    self.rename_dict[rule[0]] = rule[1]
+                    self.rename_dict_reverse[rule[1]] = rule[0]
                     continue
 
                 elif len(query) == 1:
@@ -559,53 +571,82 @@ class NeuronGraph():
                 for node in queried_nodes:
 
                     if node.find(rule[0]) == 0:
-                        rename_dict[node] = node.replace(node[:len(rule[0])], rule[1], 1)
+                        replace = node.replace(node[:len(rule[0])], rule[1], 1)
+                        self.rename_dict[node] = replace
+                        self.rename_dict_reverse[replace] = node
 
-            self.g = nx.relabel_nodes(self.g, rename_dict)
+            # # rename exclusion lists
+            # renamed_neuron_list = []
+            # neurons_set = set(self.neurons_list)
+            # for n in list(self.g.nodes()):
+            #     print(n)
+            #     if n in neurons_set:
+            #         renamed_neuron_list.append(n)
+            # self.neurons_list = renamed_neuron_list
 
-        nx.write_gpickle(self.g, self.output_graph_pp_path)
+            self.g = nx.relabel_nodes(self.g, self.rename_dict)
+
+            for l in [self.presynapse_exclusion_list, self.postsynapse_exclusion_list, self.neurons_list]:
+                for i, n in enumerate(l):
+                    if n in self.rename_dict:
+                        l[i] = self.rename_dict[n]
+
+        # nx.write_gpickle(self.g, self.output_graph_pp_path)
 
         # else:
 
         #     self.g = nx.read_gpickle(self.output_graph_pp_path)
         #     print("Num of nodes (filtered): ", self.g.number_of_nodes())
 
-    def save_user_edges_debug(self):
-        if self.debug_edges_list is not None and \
-                len(self.debug_edges_list) == 2:
-            self.debug_spec_edges(self.debug_edges_list[0], self.debug_edges_list[1])
+    # def save_user_edges_debug(self):
+    #     if self.debug_edges_list is not None and \
+    #             len(self.debug_edges_list) == 2:
+    #         self.save_edges_to_csv(self.debug_edges_list[0], self.debug_edges_list[1])
 
-    def debug_spec_edges(self, pre_list=None, post_list=None):
+    def save_edges_to_csv(self, pre_list=None, post_list=None, fname=None):
         """Debug edges: proofread output."""
-        # if self.debug_edges and len(an_type) == 0:
-        #     el_to_save = self.debug_edges_list
-        # else:
         full_list = list(self.g.nodes())
+
         if pre_list is None:
             pre_list = full_list
+        else:
+            pre_list = self.rename_list(pre_list, reverse=True)
+
         if post_list is None:
             post_list = full_list
-        el_to_save = [pre_list, post_list]
-        # elif an_type == "pres":
-        #     el_to_save = [[pre, post] for pre in full_list for post in small_list]
-        #     print("### Info: Saving debug edges pre partners...")
-        # elif an_type == "posts":
-        #     el_to_save = [[pre, post] for pre in small_list for post in full_list]
-        #     print("### Info: Saving debug edges post partners...")
-        # elif an_type == "some":
-        #     el_to_save = [[pre, post] for pre in small_list for post in small_list]
-        #     print("### Info: Saving debug edges for small Adjacency mat...")
+        else:
+            post_list = self.rename_list(post_list, reverse=True)
+
+        # print("full_list:", full_list)
+        # print("pre_list:", pre_list)
+        # print("post_list:", post_list)
+        # print("self.edge_list_df:", self.edge_list_df)
+
+        # el_to_save = [pre_list, post_list]
+        el_to_save = [[pre, post] for pre in pre_list for post in post_list]
+
+        # print(self.edge_list_df[
+        #         (self.edge_list_df['pre_partner'] == 'purkinje_1') &
+        #         (self.edge_list_df['post_partner'] == 'interneuron_87')])
+        # exit()
 
         deb_edge_list = pd.DataFrame()
         for i in range(len(el_to_save)):
+            # print("el_to_save[i][0]:", el_to_save[i][0])
+            # print("el_to_save[i][1]:", el_to_save[i][1])
             q = self.edge_list_df[
                 (self.edge_list_df['pre_partner'] == el_to_save[i][0]) &
                 (self.edge_list_df['post_partner'] == el_to_save[i][1])
                 ]
+            # print(q)
             if len(q) > 0:
                 deb_edge_list = deb_edge_list.append(q, ignore_index=True)
 
-        deb_edge_list.to_csv(self.output_debug_edges_path)
+        # print("deb_edge_list:", deb_edge_list)
+        # exit()
+        if fname is None:
+            fname = self.get_debug_edges_file_path()
+        deb_edge_list.to_csv(fname + '.csv')
 
     def get_matrix(self):
         return self.A
@@ -618,3 +659,42 @@ class NeuronGraph():
 
     def get_postsynapse_exclusion_list(self):
         return self.postsynapse_exclusion_list
+
+    def get_neurons_list(self):
+
+        # # rename exclusion lists
+        # renamed_neuron_list = []
+        # neurons_set = set(self.neurons_list)
+        # for n in list(self.g.nodes()):
+        #     print(n)
+        #     if n in neurons_set:
+        #         renamed_neuron_list.append(n)
+        # self.neurons_list = renamed_neuron_list
+
+        # all_nodes = self.g.nodes()
+        # filtered = []
+        # for n in all_nodes
+        # return self.neurons_list
+
+        return list(self.g.nodes())
+
+    def rename_list(self, l, reverse=False):
+
+        dictionary = self.rename_dict if not reverse else self.rename_dict_reverse
+
+        ll = []
+        for n in l:
+            if n in self._named_lists:
+                nl = self._named_lists[n]
+                for nn in nl:
+                    ll.append(nn)
+            else:
+                ll.append(n)
+
+        ret = []
+        for n in ll:
+            if n in dictionary:
+                n = dictionary[n]
+            ret.append(n)
+
+        return ret

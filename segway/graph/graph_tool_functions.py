@@ -1,8 +1,8 @@
 import numpy as np
 from graph_tool.all import *
 
-""" G is the graph in graph tool and gnx in networkx"""
 
+""" G is the graph in graph tool and gnx in networkx"""
 
 def create_edges_graph_gt(G, edge_list_ids):
     """Create graph in GT through edge_list_ids."""
@@ -22,7 +22,6 @@ def create_edges_graph_gt(G, edge_list_ids):
 
     return G
 
-
 def convert_el_to_ids(edge_list, neurons_to_ids):
     """Input neurons_to_ids is n_dic."""
     edge_list_ids = []
@@ -40,7 +39,6 @@ def convert_el_to_ids(edge_list, neurons_to_ids):
                corresponding weight!")
 
     return edge_list_ids
-
 
 def create_nodes_and_attr_gt(gnx):
     """Create the nodes of the graph with useful attribute/properties in graph-tool."""
@@ -60,6 +58,8 @@ def create_nodes_and_attr_gt(gnx):
     G.vertex_properties['pos_y'] = pos_y
     pos_z = G.new_vertex_property("float")
     G.vertex_properties['pos_z'] = pos_z
+    pos = G.new_vertex_property("vector<float>")
+    G.vertex_properties['pos'] = pos
 
     # networkx attributes
     nx_att_celltype = dict(gnx.nodes(data='cell_type'))
@@ -72,10 +72,10 @@ def create_nodes_and_attr_gt(gnx):
         pos_x[i] = nx_att_x[nid]
         pos_y[i] = nx_att_y[nid]
         pos_z[i] = nx_att_z[nid]
+        pos[i] = np.array([nx_att_x[nid], nx_att_y[nid]])
         node_name[i] = nid
 
     return G, n_dic
-
 
 def create_neurons_to_ids(gnx):
     """Create ids mapping the neurons which will be the nodes."""
