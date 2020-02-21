@@ -73,8 +73,30 @@ class GraphAnalysis():
                 # initialize or overwrite value
                 setattr(self, key, params[key])
 
+    def _convert_nx_to_gt(self):
+        self.gt, self.neurons_to_ids = gtx.create_nodes_and_attr_gt(self.gnx)
+        print("### Number of nodes in graph tool: ", self.gt.num_vertices())
+        self.edge_list_ids = gtf.convert_el_to_ids(self.edge_list, self.neurons_to_ids)
+        self.gt = gtf.create_edges_graph_gt(self.gt, self.edge_list_ids)
+        print("### Number of edges in graph tool: ", self.gt.num_edges())
+
     def plot_graphs(self):
         """Plot graphs in networkx and graph-tool according to the specified configs"""
+        if len(self.graphtool_plot) > 0 :
+            for plot in self.graphtool_plot:
+                self.simple = plot.get('simple', False)
+                self.pos = plot.get('pos', False)
+                self.degree = plot.get('degree', False)
+
+            if self.pos:
+                pos = self.gt.vertex_properties['pos']
+
+
+        if len(self.networkx_plot) > 0:
+            for plot in self.networkx_plot:
+                self.simple = plot.get('simple', False)
+                self.pos = plot.get('pos', False)
+                self.degree = plot.get('degree', False)
 
 if __name__ == '__main__':
 
