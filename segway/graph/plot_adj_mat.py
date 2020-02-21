@@ -46,7 +46,7 @@ class PlotConfig():
 
         self.threshold_min = configs.get('weights_threshold_min', None)
         self.threshold_max = configs.get('weights_threshold_max', None)
-
+        self.colorbar = configs.get('colorbar', False)
         # self.plot_type = configs.get('plot_type', None)
         self.save_edges_to_csv = configs.get('save_edges_to_csv', True)
 
@@ -122,13 +122,13 @@ def plot_adj_mat(synapse_graph, configs):
         :, [full_list.index(name) for name in post_list]
     ]
 
-    _plot_adj_mat(mat, pre_list, post_list, plot_config, synapse_graph, transposed=False)
-    _plot_adj_mat(mat, pre_list, post_list, plot_config, synapse_graph, transposed=True)
+    _plot_adj_mat(mat, pre_list, post_list, plot_config, synapse_graph, transposed=False, colorbar=plot_config.colorbar)
+    _plot_adj_mat(mat, pre_list, post_list, plot_config, synapse_graph, transposed=True, colorbar=plot_config.colorbar)
 
 
 def _plot_adj_mat(
         mat, pre_list, post_list, plot_config,
-        synapse_graph, transposed=False):
+        synapse_graph, transposed=False, colorbar=False):
 
     # fig = plt.figure(figsize=(16, 15))
     fig = plt.figure(figsize=(14.5, 14.5))
@@ -153,7 +153,8 @@ def _plot_adj_mat(
     ax.grid(True, which='minor', alpha=0.2)
     ax.tick_params(axis='both', which='both', labelsize=8)
     i = ax.imshow(mat)
-    # plt.colorbar(i, ax=ax)
+    if colorbar:
+        plt.colorbar(i, ax=ax)
     plt.tight_layout()
     # fig.savefig(synapse_graph.output_dir + '/' + configs['output_plot'])
 
