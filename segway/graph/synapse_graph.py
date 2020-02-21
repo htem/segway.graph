@@ -646,7 +646,11 @@ class SynapseGraph():
         # exit()
         if fname is None:
             fname = self.get_debug_edges_file_path()
+<<<<<<< HEAD
         deb_edge_list.to_csv(fname + '.csv')
+=======
+        deb_edge_list.to_csv(fname)
+>>>>>>> a33ff23cf6f12d06a78e825c49490290f417807f
 
     def get_matrix(self):
         return self.A

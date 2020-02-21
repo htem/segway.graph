@@ -9,11 +9,20 @@ import networkx as nx
 from networkx.algorithms import moral
 from networkx.utils import reverse_cuthill_mckee_ordering
 
+<<<<<<< HEAD
+=======
+
+def atoi(text):
+    return int(text) if text.isdigit() else text
+>>>>>>> a33ff23cf6f12d06a78e825c49490290f417807f
 
 def atoi(text):
     return int(text) if text.isdigit() else text
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> a33ff23cf6f12d06a78e825c49490290f417807f
 def natural_keys(text):
     '''
     alist.sort(key=natural_keys) sorts in human order
@@ -46,7 +55,11 @@ class PlotConfig():
 
         self.threshold_min = configs.get('weights_threshold_min', None)
         self.threshold_max = configs.get('weights_threshold_max', None)
+<<<<<<< HEAD
         self.colorbar = configs.get('colorbar', False)
+=======
+
+>>>>>>> a33ff23cf6f12d06a78e825c49490290f417807f
         # self.plot_type = configs.get('plot_type', None)
         self.save_edges_to_csv = configs.get('save_edges_to_csv', True)
 
@@ -122,13 +135,22 @@ def plot_adj_mat(synapse_graph, configs):
         :, [full_list.index(name) for name in post_list]
     ]
 
+<<<<<<< HEAD
     _plot_adj_mat(mat, pre_list, post_list, plot_config, synapse_graph, transposed=False, colorbar=plot_config.colorbar)
     _plot_adj_mat(mat, pre_list, post_list, plot_config, synapse_graph, transposed=True, colorbar=plot_config.colorbar)
+=======
+    _plot_adj_mat(mat, pre_list, post_list, plot_config, synapse_graph, transposed=False)
+    _plot_adj_mat(mat, pre_list, post_list, plot_config, synapse_graph, transposed=True)
+>>>>>>> a33ff23cf6f12d06a78e825c49490290f417807f
 
 
 def _plot_adj_mat(
         mat, pre_list, post_list, plot_config,
+<<<<<<< HEAD
         synapse_graph, transposed=False, colorbar=False):
+=======
+        synapse_graph, transposed=False):
+>>>>>>> a33ff23cf6f12d06a78e825c49490290f417807f
 
     # fig = plt.figure(figsize=(16, 15))
     fig = plt.figure(figsize=(14.5, 14.5))
@@ -153,8 +175,12 @@ def _plot_adj_mat(
     ax.grid(True, which='minor', alpha=0.2)
     ax.tick_params(axis='both', which='both', labelsize=8)
     i = ax.imshow(mat)
+<<<<<<< HEAD
     if colorbar:
         plt.colorbar(i, ax=ax)
+=======
+    # plt.colorbar(i, ax=ax)
+>>>>>>> a33ff23cf6f12d06a78e825c49490290f417807f
     plt.tight_layout()
     # fig.savefig(synapse_graph.output_dir + '/' + configs['output_plot'])
 
