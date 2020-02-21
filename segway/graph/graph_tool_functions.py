@@ -28,11 +28,13 @@ def convert_el_to_ids(edge_list, neurons_to_ids):
 
     if len(edge_list[0]) == 2:
         for e in edge_list:
-            edge_list_ids.append((neurons_to_ids[e[0]], neurons_to_ids[e[1]]))
+            if e[0] in neurons_to_ids.keys() and e[1] in neurons_to_ids.keys():
+                edge_list_ids.append((neurons_to_ids[e[0]], neurons_to_ids[e[1]]))
 
     elif len(edge_list[0]) == 3:
         for e in edge_list:
-            edge_list_ids.append((neurons_to_ids[e[0]], neurons_to_ids[e[1]], e[2]))
+            if e[0] in neurons_to_ids.keys() and e[1] in neurons_to_ids.keys():
+                edge_list_ids.append((neurons_to_ids[e[0]], neurons_to_ids[e[1]], e[2]))
 
     else:
         print("ERROR: edge_list has to be in (pre, post) format: third entry should be the\
