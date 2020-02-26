@@ -12,8 +12,14 @@ def create_edges_graph_gt(G, edge_list_ids):
 
     elif len(edge_list_ids[0]) == 3:
         # the weights are the 3rd column
-        weight = G.new_edge_property('float')
-        G.add_edge_list(edge_list_ids, eprops=[weight])
+        weight = G.new_edge_property('double')
+        G.add_edge_list(edge_list_ids)
+        w = []
+        for el in edge_list_ids:
+            w.append(el[2])
+        weight.a = w
+        G.ep['weight'] = weight
+
         print("### Info : Edges and weights created!")
 
     else:
@@ -86,3 +92,10 @@ def create_neurons_to_ids(gnx):
         n_dic[n] = i
 
     return n_dic
+
+def create_ids_to_neurons(n_dic):
+    ids_to_neurons = {}
+    for k,v in n_dic.items():
+        ids_to_neurons[v] = k
+
+    return ids_to_neurons
