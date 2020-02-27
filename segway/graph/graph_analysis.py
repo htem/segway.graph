@@ -56,9 +56,14 @@ class GraphAnalysis():
         self.plot_subgraphs = []
         self.plot_motifs_counts = []
         self.identify_motifs = {}
+
         # useful dictionaries that maps the variables needed
         self.map_counts = defaultdict(list)
         self.map_motifs = defaultdict(list)
+        self.num_name = {"duplets" : 2,
+                         "triplets": 3,
+                         "quadruplets": 4,
+                         "quintuplets": 5}
 
 
     def __read_configs(self):
@@ -300,7 +305,7 @@ class GraphAnalysis():
             if random:
                 # generate another plot for random
                 self.rg = Graph(self.gt)
-                graph_tool.generation.random_rewire(self.rg, model='erdos', n_iter=100)
+                graph_tool.generation.random_rewire(self.rg, model='constrained-configuration', n_iter=100)
             if analysis_type == 'pagerank':
                 pr_res = self.pagerank(random=random)
                 if colorbar:
@@ -605,7 +610,7 @@ class GraphAnalysis():
         # create random graph if not existing
         if not hasattr(self, 'rg'):
             self.rg = Graph(self.gt)
-            graph_tool.generation.random_rewire(self.rg, model='erdos', n_iter=100)
+            graph_tool.generation.random_rewire(self.rg, model='constrained-configuration', n_iter=100)
 
         # map_counts = {
         #            'duplets' : [self.dup_counts, self.r_dup_counts],
@@ -619,8 +624,8 @@ class GraphAnalysis():
                 self.countfind_motifs(self.gt, motif)
                 counts = np.array(self.map_counts[motif][0])[np.array(motif_idx)]
                 fig = plt.figure(figsize=(14,10))
-                plt.scatter(np.linspace(0,len(counts)-1,len(counts)), counts)
-                plt.xticks(np.linspace(0,len(counts)-1,len(counts)))
+                ax1 = fig.add_subplot(111)
+                ax1.scatter(np.arange(len(counts)), counts)
 
                 if motif in self.random_motifs:
                     self.countfind_motifs(self.rg, motif, random=True)
@@ -633,11 +638,19 @@ class GraphAnalysis():
                             var[idx].append(0)
                     # plot also random
                     rcounts = np.array(self.map_counts[motif][1])[np.array(motif_idx)]
-                    plt.scatter(np.linspace(0,len(rcounts)-1,len(rcounts)), rcounts, c='r')
-                    plt.legend(['connectome', 'random'])
+                    ax1.scatter(np.arange(len(rcounts)), rcounts, c='r')
+                    ax1.legend(['connectome', 'random'])
+                    # create second figure for comparing motifs counts
+                    fig2 = plt.figure(figsize=(14,10))
+                    ax2 = fig2.add_subplot(111)
+                    ax2.bar(np.arange(len(counts)), np.array(counts)-np.array(rcounts))
+                    ax2.set_xticks(np.arange(len(counts)))
+                    ax2.set_ylabel("connectome - random")
+                    fig2.savefig(self.output_dir + "/" + motif + "_diffmot_count" + str(i))
 
-                plt.plot(counts, color='black', linestyle='--', alpha=0.6)
-                fig.savefig(self.output_dir + "/" + motif+ "_motifs"+str(i))
+                ax1.plot(counts, color='black', linestyle='--', alpha=0.6)
+                ax1.set_xticks(np.arange(len(counts)))
+                fig.savefig(self.output_dir + "/" + motif+ "_mot_count" + str(i))
 
 
     def plot_motifs(self):
@@ -683,11 +696,6 @@ class GraphAnalysis():
 
     def find_neurons_motifs(self, key, value):
 
-        # useful dictionary
-        num_name = {"duplets" : 2,
-                    "triplets": 3,
-                    "quadruplets": 4,
-                    "quintuplets": 5}
         print("-------------------------------------")
         print("Identified %s type %d : " % (key, value))
 
@@ -695,7 +703,7 @@ class GraphAnalysis():
 
         m = []
         for j in range(len(vps)):
-            a = np.zeros(num_name[key], dtype=int)
+            a = np.zeros(self.num_name[key], dtype=int)
             for i, x in enumerate(vps[j]):
                 a[i] = x
 
@@ -739,6 +747,21 @@ class GraphAnalysis():
 
         return
 
+    def compute_significance_motifs(self):
+
+        for motif in self.random_motifs:
+            print("### Info: computing significance for motif %s" % motif)
+            [m, zscore] = motif_significance(self.gt, self.num_name[motif])
+            # corrections
+            zs = np.array(zscore)*np.sqrt(len(m))
+            cdf = scipy.stats.norm.cdf(zs)
+            p_values = 1-cdf;
+            sig = np.where(p_values < 0.05/(len(m)-1))[0]
+            print('****** %s ******' % motif)
+            print("Signifcance found for the following motifs:")
+            print(sig)
+
+
 if __name__ == '__main__':
 
     assert len(sys.argv) > 1
@@ -766,6 +789,7 @@ if __name__ == '__main__':
         ga.std_graph_analysis()
         ga.plot_counts_motifs()
         ga.plot_motifs()
+        ga.compute_significance_motifs()
 
     if print_motifs:
         ga.print_neurons_motifs()
