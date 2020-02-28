@@ -11,6 +11,7 @@ import json
 from collections import defaultdict
 import itertools
 import scipy
+from scipy import signal
 import matplotlib as mpl
 from matplotlib import cm
 import graph_tool_functions as gtf
@@ -235,13 +236,13 @@ class GraphAnalysis():
                 print("### Info: Pearson correlation ...")
                 corr, pv = scipy.stats.pearsonr(x,y)
                 print("Pearson corr = " , corr)
-                if pv < 0.01:
+                if pv < 0.01/(len(A)**2):
                     print("p-value < 0.01 : Pearson correlation is significant!")
                 else:
                     print("Nothing can be said on the correlation of the two variables!")
 
                 fig = plt.figure(figsize=(13,10))
-                R = scipy.signal.correlate2d(self.sim_mat,self.A, mode='same')
+                R = signal.correlate2d(self.sim_mat,self.A, mode='same')
                 # R[np.isnan(R)] = 0
                 plt.imshow(R)
                 plt.colorbar()
@@ -433,6 +434,11 @@ class GraphAnalysis():
         print('### Info: computing closeness centrality on graph ...')
         c = closeness(self.gt)
         c.a[np.isnan(c.a)] = 0
+        c_list = [(i,pr) for i, pr in enumerate(c)]
+        cs = sorted(c_list, key = lambda x: x[1], reverse=True)
+        self.sorted_c = [self.ids_to_neurons[tup[0]] for tup in cs]
+        print("Closeness results sorted by score:")
+        print(self.sorted_c)
 
         if self.ctype:
             vertex_text= self.gt.vertex_properties['cell_type']
@@ -461,6 +467,11 @@ class GraphAnalysis():
         fname = 'betweeness.png'
         print('### Info: computing betweeness centrality on graph ...')
         vp, ep = betweenness(self.gt)
+        vp_list = [(i,pr) for i, pr in enumerate(vp)]
+        vps = sorted(vp_list, key = lambda x: x[1], reverse=True)
+        self.sorted_vp = [self.ids_to_neurons[tup[0]] for tup in vps]
+        print("Betweeness results sorted by score:")
+        print(self.sorted_vp)
 
         if self.ctype:
             vertex_text= self.gt.vertex_properties['cell_type']
@@ -750,10 +761,10 @@ class GraphAnalysis():
     def compute_significance_motifs(self):
 
         for motif in self.random_motifs:
-            print("### Info: computing significance for motif %s" % motif)
+            print("### Info: computing significance for motif: %s" % motif)
             [m, zscore] = motif_significance(self.gt, self.num_name[motif])
             # corrections
-            zs = np.array(zscore)*np.sqrt(len(m))
+            zs = np.array(zscore) #*np.sqrt(len(m))
             cdf = scipy.stats.norm.cdf(zs)
             p_values = 1-cdf;
             sig = np.where(p_values < 0.05/(len(m)-1))[0]
@@ -767,6 +778,8 @@ if __name__ == '__main__':
     assert len(sys.argv) > 1
     config_f = sys.argv[1]
     ga = GraphAnalysis(config_f)
+
+    print("LIST OF ISOLATED NODES: ", [i for i in nx.isolates(ga.gnx)])
 
     analysis = False
     print_motifs = False
@@ -787,6 +800,7 @@ if __name__ == '__main__':
     if analysis:
         ga.plot_graphs()
         ga.std_graph_analysis()
+        ga.iter_similarity_plots()
         ga.plot_counts_motifs()
         ga.plot_motifs()
         ga.compute_significance_motifs()
