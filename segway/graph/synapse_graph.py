@@ -71,6 +71,7 @@ class SynapseGraph():
         self.debug_edges = False
         self.debug_edges_list = None
         self.rename_rules = []
+        self.rename_rules2 = []
         self.plots = []
         self.weights_with_dist = False
         self.presynapse_exclusion_list = []
@@ -456,6 +457,7 @@ class SynapseGraph():
 
         if self.input_method == 'user_list':
             self.neurons_list = sorted(list(set(self.input_neurons_list)))
+            self.neurons_list = self.add_named_lists(self.neurons_list)
         elif self.input_method == 'all':
             # WARNING : in 'neuron_db_server.py' there is the limit of 10000 neurons
             # so 10000 neurons will be queried
@@ -525,7 +527,6 @@ class SynapseGraph():
 
     def preprocess_graph(self):
         """If preprocessed graph is not existing or overwriting is on."""
-        # if self.overwrite or not os.path.exists(self.output_graph_pp_path):
 
         # Preprocessing the graph, given specifications in the config file
         pre_proc = len(self.exclude_neurons) or len(self.tags_to_exclude) or len(self.exclude_edges)
@@ -548,18 +549,21 @@ class SynapseGraph():
         # if instead the cell type is specified (eg basket) the rename will be basket_ and it
         # assumes the interneuron finished
 
-        self.rename_dict = dict()
-        self.rename_dict_reverse = dict()
-        if len(self.rename_rules):
-            self.rename_dict = dict()
+        self.preprocess_full_list = list(self.g.nodes())
 
+        self.rename_dict = dict()
+        if len(self.rename_rules):
             for rule in self.rename_rules:
                 # rule to query the node of interest
-                query = rule[2]
+                from_name = rule[0]
+                to_name = rule[1]
+                query = {}
+                if len(rule) >= 3:
+                    query = rule[2]
+
                 if len(query) == 0:
                     # direct rename
-                    self.rename_dict[rule[0]] = rule[1]
-                    self.rename_dict_reverse[rule[1]] = rule[0]
+                    self.rename_dict[from_name] = to_name
                     continue
 
                 elif len(query) == 1:
@@ -574,42 +578,86 @@ class SynapseGraph():
                             if d[k] == v:
                                 nodes_dict[n] += 1
 
-                    queried_nodes = list(dict(filter(lambda val: val[1] == 2, nodes_dict.items())).keys())
+                    queried_nodes = list(
+                        dict(filter(lambda val: val[1] == 2, nodes_dict.items())).keys())
 
                 for node in queried_nodes:
 
-                    if node.find(rule[0]) == 0:
-                        replace = node.replace(node[:len(rule[0])], rule[1], 1)
+                    if node.find(from_name) == 0:
+                        replace = node.replace(node[:len(from_name)], to_name, 1)
                         self.rename_dict[node] = replace
-                        self.rename_dict_reverse[replace] = node
 
-            # # rename exclusion lists
-            # renamed_neuron_list = []
-            # neurons_set = set(self.neurons_list)
-            # for n in list(self.g.nodes()):
-            #     print(n)
-            #     if n in neurons_set:
-            #         renamed_neuron_list.append(n)
-            # self.neurons_list = renamed_neuron_list
+        if len(self.rename_rules2):
+            for rule in self.rename_rules2:
+                criterias = rule[0]
+                actions = rule[1]
 
-            self.g = nx.relabel_nodes(self.g, self.rename_dict)
+                neuron_list = self.get_filtered_list(criterias)
 
-            for l in [self.presynapse_exclusion_list, self.postsynapse_exclusion_list, self.neurons_list]:
-                for i, n in enumerate(l):
-                    if n in self.rename_dict:
-                        l[i] = self.rename_dict[n]
+                for neuron in neuron_list:
+                    current_name = self.rename_dict.get(neuron, neuron)
+                    new_name = self.apply_rename_action(current_name, actions)
+                    self.rename_dict[neuron] = new_name
 
-        # nx.write_gpickle(self.g, self.output_graph_pp_path)
+        self.rename_dict_reverse = dict()
+        for k in self.rename_dict:
+            self.rename_dict_reverse[self.rename_dict[k]] = k
 
-        # else:
+        # if len(self.rename_dict):
 
-        #     self.g = nx.read_gpickle(self.output_graph_pp_path)
-        #     print("Num of nodes (filtered): ", self.g.number_of_nodes())
+        #     # self.g = nx.relabel_nodes(self.g, self.rename_dict)
+
+        #     for l in [self.presynapse_exclusion_list, self.postsynapse_exclusion_list, self.neurons_list]:
+        #         for i, n in enumerate(l):
+        #             if n in self.rename_dict:
+        #                 l[i] = self.rename_dict[n]
 
     # def save_user_edges_debug(self):
     #     if self.debug_edges_list is not None and \
     #             len(self.debug_edges_list) == 2:
     #         self.save_edges_to_csv(self.debug_edges_list[0], self.debug_edges_list[1])
+
+    def apply_rename_action(self, name, actions):
+
+        for action in actions:
+            action_type = action[0]
+            if action_type == "replace":
+                name = name.replace(action[1], action[2])
+            elif action_type == "prepend":
+                name = action[1] + name
+            else:
+                assert False, "Action %s not supported yet!" % action_type
+
+        return name
+
+    def check_criterias(self, name, criterias):
+        neuron = self.g.node[name]
+        for c in criterias:
+            if c == "soma_x_min":
+                if neuron['x'] <= criterias[c]:
+                    return False
+            elif c == "soma_x_min_div16":
+                if neuron['x']/16 <= criterias[c]:
+                    return False
+            elif c == "soma_x_max":
+                if neuron['x'] > criterias[c]:
+                    return False
+            elif c == "soma_x_max_div16":
+                if neuron['x']/16 > criterias[c]:
+                    return False
+            elif c == "soma_y_min":
+                if neuron['y'] <= criterias[c]:
+                    return False
+            elif c == "soma_y_min_div16":
+                if neuron['y']/16 <= criterias[c]:
+                    return False
+            elif c == "soma_y_max":
+                if neuron['y'] > criterias[c]:
+                    return False
+            elif c == "soma_y_max_div16":
+                if neuron['y']/16 > criterias[c]:
+                    return False
+        return True
 
     def save_edges_to_csv(self, pre_list=None, post_list=None, fname=None):
         """Debug edges: proofread output."""
@@ -686,23 +734,59 @@ class SynapseGraph():
 
         return list(self.g.nodes())
 
-    def rename_list(self, l, reverse=False):
-
-        dictionary = self.rename_dict if not reverse else self.rename_dict_reverse
-
+    def add_named_lists(self, l):
         ll = []
+        # print(l)
         for n in l:
-            if n in self._named_lists:
+
+            # print(n)
+
+            if isinstance(n, dict):
+                n = self.get_filtered_list(n)
+                for nn in n:
+                    ll.append(nn)
+
+            elif n in self._named_lists:
                 nl = self._named_lists[n]
                 for nn in nl:
                     ll.append(nn)
+
             else:
                 ll.append(n)
+        return ll
+
+    def expand_list(self, neuron_list):
+        return self.add_named_lists(neuron_list)
+
+    def rename_list(self, neuron_list, reverse=False):
+
+        dictionary = self.rename_dict if not reverse else self.rename_dict_reverse
+
+        # ll = self.expand_list(neuron_list)
 
         ret = []
-        for n in ll:
+        for n in neuron_list:
             if n in dictionary:
                 n = dictionary[n]
             ret.append(n)
 
         return ret
+
+    def get_filtered_list(self, criterias):
+
+        if 'list' in criterias:
+            unfiltered_list = criterias['list']
+            criterias.pop('list')
+        else:
+            unfiltered_list = self.preprocess_full_list
+        unfiltered_list = self.add_named_lists(unfiltered_list)
+
+        filtered_list = []
+        if len(criterias):
+            for neuron in unfiltered_list:
+                if self.check_criterias(neuron, criterias):
+                    filtered_list.append(neuron)
+        else:
+            filtered_list = unfiltered_list
+
+        return filtered_list

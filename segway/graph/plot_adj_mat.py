@@ -62,6 +62,8 @@ class PlotConfig():
         self.synapse_graph = synapse_graph
 
         self.also_plot_transposed = configs.get('also_plot_transposed', False)
+        self.plot_width = configs.get('plot_width', 14.5)
+        self.plot_height = configs.get('plot_height', 14.5)
 
     def get_output_fname(self, arg):
         if self.threshold_min:
@@ -99,39 +101,50 @@ def plot_adj_mat(synapse_graph, configs):
         if plot_config.threshold_max is not None:
             A[A > plot_config.threshold_max] = plot_config.threshold_max
 
-    pre_list = synapse_graph.rename_list(plot_config.pre_list)
-    post_list = synapse_graph.rename_list(plot_config.post_list)
+    pre_list = synapse_graph.expand_list(plot_config.pre_list)
+    print("plot_config.post_list:", plot_config.post_list)
+    post_list = synapse_graph.expand_list(plot_config.post_list)
+    print("post_list:", post_list)
+
     pre_list, post_list = remove_exclusion_list(synapse_graph, pre_list, post_list)
+
+    pre_list_renamed = synapse_graph.rename_list(pre_list)
+    post_list_renamed = synapse_graph.rename_list(post_list)
+    full_list_renamed = synapse_graph.rename_list(full_list)
+
+    # print(pre_list_renamed)
+    print("post_list_renamed:", post_list_renamed)
+    # print(full_list_renamed)
 
     if plot_config.sort is not None:
         if plot_config.sort == 'patterns':
             ug = moral.moral_graph(graph)
             rcm = list(reverse_cuthill_mckee_ordering(ug))
-            pre_list = [n for n in rcm if n in pre_list]
-            post_list = [n for n in rcm if n in post_list]
-            # pre_list = full_list
+            pre_list_renamed = [n for n in rcm if n in pre_list_renamed]
+            post_list_renamed = [n for n in rcm if n in post_list_renamed]
+            # pre_list_renamed = full_list
         elif plot_config.sort == 'labels':
-            pre_list = sorted(pre_list, key=natural_keys)
-            post_list = sorted(post_list, key=natural_keys)
+            pre_list_renamed = sorted(pre_list_renamed, key=natural_keys)
+            post_list_renamed = sorted(post_list_renamed, key=natural_keys)
         elif plot_config.sort == 'sort':
             assert False, "This option is not properly implemented"
             # TODO: need to also sort labels along with mat
             mat = np.sort(mat)
         else:
             # prelist and postlist should have the same order as the full list
-            pre_list = [n for n in full_list if n in pre_list]
-            post_list = [n for n in full_list if n in post_list]
+            pre_list_renamed = [n for n in full_list_renamed if n in pre_list_renamed]
+            post_list_renamed = [n for n in full_list_renamed if n in post_list_renamed]
 
     mat = A[
-        [full_list.index(name) for name in pre_list], :
+        [full_list_renamed.index(name) for name in pre_list_renamed], :
     ]
     mat = mat[
-        :, [full_list.index(name) for name in post_list]
+        :, [full_list_renamed.index(name) for name in post_list_renamed]
     ]
 
-    _plot_adj_mat(mat, pre_list, post_list, plot_config, synapse_graph, transposed=False, colorbar=plot_config.colorbar)
+    _plot_adj_mat(mat, pre_list_renamed, post_list_renamed, plot_config, synapse_graph, transposed=False, colorbar=plot_config.colorbar)
     if plot_config.also_plot_transposed:
-        _plot_adj_mat(mat, pre_list, post_list, plot_config, synapse_graph, transposed=True, colorbar=plot_config.colorbar)
+        _plot_adj_mat(mat, pre_list_renamed, post_list_renamed, plot_config, synapse_graph, transposed=True, colorbar=plot_config.colorbar)
 
 
 def _plot_adj_mat(
@@ -139,7 +152,10 @@ def _plot_adj_mat(
         synapse_graph, transposed=False, colorbar=False):
 
     # fig = plt.figure(figsize=(16, 15))
-    fig = plt.figure(figsize=(14.5, 14.5))
+    if not transposed:
+        fig = plt.figure(figsize=(plot_config.plot_width, plot_config.plot_height))
+    else:
+        fig = plt.figure(figsize=(plot_config.plot_height, plot_config.plot_width))
     ax = fig.add_subplot(111)
 
     if transposed:
