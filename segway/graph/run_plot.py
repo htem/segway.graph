@@ -3,8 +3,10 @@ import json
 from jsmin import jsmin
 from io import StringIO
 
-from segway.graph.synapse_graph import SynapseGraph
-from segway.graph.plot_adj_mat import plot_adj_mat
+# from segway.graph.synapse_graph import SynapseGraph
+# from segway.graph.plot_adj_mat import plot_adj_mat
+from synapse_graph import SynapseGraph
+from plot_adj_mat import plot_adj_mat
 
 
 if __name__ == '__main__':
