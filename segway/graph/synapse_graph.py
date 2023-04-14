@@ -123,8 +123,6 @@ class SynapseGraph():
             for sfid in self.G.nodes[node]['superfragments']:
                 self.sfid_to_nid[sfid] = node
 
-        # print(self.sfid_to_nid[12882210324481]); asdf
-
         synapse_data = self._get_synapse_data(node_data)
 
         self._add_edges(synapse_data=synapse_data,
@@ -136,11 +134,8 @@ class SynapseGraph():
                         synapse_score_fn=synapse_score_fn,
                         )
 
-        # get neuron names of unmapped superfragments if available
+        # TODO: get neuron names of unmapped superfragments if available
         # self._add_names_to_found_superfragments()
-        for edge in self.G.edges:
-            print(edge)
-            print(self.G.edges[edge])
 
     def _add_names_to_found_superfragments(self):
         nodes = list(self.G.nodes)
@@ -198,7 +193,6 @@ class SynapseGraph():
         syn_ids = []
         for node in nodes:
             superfragments = node.data['segments']
-            print(len(superfragments))
             sf_infos = self.superfragment_db.get_list(superfragments)
             for sf in sf_infos:
                 syn_ids.extend(sf['syn_ids'])
@@ -209,8 +203,6 @@ class SynapseGraph():
         for syn_id in syn_ids:
             syn_info = self.synapse_db.get(syn_id)
             ret.append(syn_info)
-            # print(syn_info)
-        print(len(ret))
         return ret
 
     def _add_edges(self, synapse_data,
@@ -251,9 +243,6 @@ class SynapseGraph():
                 if postsyn_nid is None:
                     postsyn_nid = syn['id_superfrag_post']
 
-            if postsyn_nid == 12882210324481:
-                asdf
-
             # by default we skip autapses which are usually false positive predictions
             if not include_autapses:
                 if self.get_base_name(presyn_nid) == self.get_base_name(postsyn_nid):
@@ -277,7 +266,7 @@ class SynapseGraph():
                     self.G.add_node(str(nid))
 
             # finally add the edge
-            print(f'{presyn_nid} to {postsyn_nid}: {attrs}')
+            # print(f'{presyn_nid} to {postsyn_nid}: {attrs}')
             self.G.add_edge(self.get_base_name(presyn_nid), self.get_base_name(postsyn_nid),
                             **attrs)
 
