@@ -266,7 +266,7 @@ class SynapseGraph():
                     self.G.add_node(str(nid))
 
             # finally add the edge
-            # print(f'{presyn_nid} to {postsyn_nid}: {attrs}')
+            logger.debug(f'{presyn_nid} to {postsyn_nid}: {attrs}')
             self.G.add_edge(self.get_base_name(presyn_nid), self.get_base_name(postsyn_nid),
                             **attrs)
 
