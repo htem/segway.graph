@@ -1,7 +1,8 @@
 # segway.graph
-Extraction and analysis of connectomic graph
 
-Installation: if package is not installed, run `source add_to_path.sh` to add package to $PYTHONPATH
+Library for making graphs from segmentation and synapse predictions produced by `segway`. This code interfaces with MongoDB/SQLite databases to produce portable NetworkX files.
 
-Example usage: `segway/graph/run_plot.py /n/groups/htem/Segmentation/shared-dev/cb2_segmentation/tmn7_graph/test.json`
-
+## Installation
+```
+pip install -U git+https://github.com/htem/segway.graph#egg=segway.graph
+```
